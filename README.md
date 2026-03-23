@@ -1,4 +1,3 @@
-```markdown
 # @civitas-cerebrum/test-coverage 🛡️
 
 A lightweight, static-analysis tool for TypeScript projects that verifies if the public methods of your classes are being called inside your test files. 
@@ -126,4 +125,3 @@ yarn remove @civitas-cerebrum/test-coverage
 ```
 
 Make sure to also remove any `npx test-coverage` commands you may have added to your GitHub Actions or `package.json` scripts!
-```
