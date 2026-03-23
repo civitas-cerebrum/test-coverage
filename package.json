@@ -1,20 +1,47 @@
 {
   "name": "@civitas-cerebrum/test-coverage",
   "version": "0.0.1",
+  "description": "Checks if public methods of TypeScript classes are called in test files via AST analysis.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "bin": {
-    "init-coverage": "./bin/init.js"
+    "test-coverage": "./dist/cli.js"
   },
-  "files": [
-    "dist",
-    "bin"
-  ],
   "scripts": {
     "clean": "rm -rf dist",
     "build": "npm run clean && tsc",
+    "test": "jest",
     "prepublishOnly": "npm run build"
   },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "typescript": "^5.0.0"
+  },
   "devDependencies": {
-    "@types/node": "^25.5.0",
-    "vitest": "^4.1.0"
-  }
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.0",
+    "typescript": "^5.0.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/civitas-cerebrum/test-coverage.git"
+  },
+  "author": "Umut Ay Bora",
+  "license": "MIT",
+  "keywords": [
+    "typescript",
+    "test-coverage",
+    "ast",
+    "static-analysis",
+    "api-integrity",
+    "automation"
+  ]
 }

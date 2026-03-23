@@ -10,6 +10,6 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "tests", "tests/fixtures"],
   "exclude": ["node_modules", "tests"]
 }
