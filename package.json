@@ -12,5 +12,8 @@
     "clean": "rm -rf dist",
     "build": "npm run clean && tsc",
     "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0"
   }
 }
