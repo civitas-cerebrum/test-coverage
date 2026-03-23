@@ -1,5 +1,8 @@
 # @civitas-cerebrum/test-coverage 🛡️
 
+[![NPM Version](https://img.shields.io/npm/v/@civitas-cerebrum/test-coverage?color=rgb(88%2C%20171%2C%2070))](https://www.npmjs.com/package/@civitas-cerebrum/test-coverage)
+
+
 A lightweight, static-analysis tool for TypeScript projects that verifies if the public methods of your classes are being called inside your test files. 
 
 Stop wondering if you forgot to write a test for a new method. `@civitas-cerebrum/test-coverage` parses your TypeScript Abstract Syntax Tree (AST) to extract your classes and methods, then checks your test files to ensure every single public API is covered.
