@@ -1,41 +1,16 @@
 {
-  "name": "@civitas-cerebrum/element-repository",
-  "version": "0.0.6",
-  "description": "A lightweight, robust package that decouples your Playwright UI selectors from your test code. By externalizing locators into a central JSON repository, you make your test automation framework cleaner, easier to maintain, and accessible to non-developers.",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "name": "@civitas-cerebrum/test-coverage",
+  "version": "0.0.1",
+  "bin": {
+    "init-coverage": "./bin/init.js"
+  },
+  "files": [
+    "dist",
+    "bin"
+  ],
   "scripts": {
     "clean": "rm -rf dist",
     "build": "npm run clean && tsc",
-    "test": "npx playwright test",
     "prepublishOnly": "npm run build"
-  },
-  "files": [
-    "dist"
-  ],
-  "devDependencies": {
-    "@playwright/test": "^1.58.2",
-    "@types/node": "^20.0.0",
-    "typescript": "^5.0.0"
-  },
-  "keywords": [
-    "playwright",
-    "automation",
-    "locators",
-    "selectors",
-    "clean-code",
-    "page-object-model",
-    "test-automation",
-    "json-repository"
-  ],
-  "publishConfig": {
-    "access": "public",
-    "provenance": true
-  },
-  "repository": {
-    "type": "git",
-    "url": "git@github.com/civitas-cerebrum/element-repository.git"
-  },
-  "author": "Umut Ay Bora",
-  "license": "MIT"
+  }
 }

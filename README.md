@@ -1,217 +1,116 @@
-# Playwright Element Repository
+# Test Coverage Reporter
 
-[![NPM Version](https://img.shields.io/npm/v/@civitas-cerebrum/element-repository?color=rgb(88%2C%20171%2C%2070))](https://www.npmjs.com/package/@civitas-cerebrum/element-repository)
+[![NPM Version](https://img.shields.io/npm/v/@civitas-cerebrum/test-coverage?color=rgb(88%2C%20171%2C%2070))](https://www.npmjs.com/package/@civitas-cerebrum/test-coverage)
 
-A lightweight, robust package that decouples your Playwright UI selectors from your test code. By externalizing locators into a central JSON repository, you make your test automation framework cleaner, easier to maintain, and accessible to non-developers.
-
-## 📦 Installation
-
-Install the package via your preferred package manager:
-
-```bash
-npm i @civitas-cerebrum/element-repository
-```
-
-**Peer Dependencies:**
-This package requires `@playwright/test` or `playwright` to be installed in your project.
+A lightweight, programmatic API coverage reporter. Automatically scans your test files to measure and enforce method usage across your framework's internal classes, ensuring no dead code or untested helpers are left behind.
 
 ## 🚀 What is it good for?
 
-* **Zero Hardcoded Selectors:** Keep your Page Objects and Step Definitions completely free of complex DOM queries.
-* **Dynamic Parsing:** Automatically converts your JSON configuration into native Playwright CSS, XPath, ID, Text, Test ID, Role, Placeholder, or Label selectors.
-* **Smart Locators:** Built-in methods for handling arrays, randomized element selection (great for catalog/PLP testing), text-filtering, attribute-filtering, and visibility checks.
-* **Soft Waiting:** Seamlessly waits for elements to attach and become visible before returning a locator to prevent flake.
+  * **Zero-Config Setup:** Includes a smart CLI scanner that automatically finds your classes and wires up your coverage script instantly.
+  * **Enforce Framework Coverage:** Ensure developers are actually utilizing the Page Objects, Step Definitions, or Utilities that you write.
+  * **Detect Dead Code:** Instantly spot legacy methods sitting in your framework that are no longer called by any active tests.
+  * **CI/CD Ready:** Programmatically generates a clean `.txt` report and logs warnings to the console without aggressively breaking your builds.
+  * **Agnostic & Encapsulated:** Safely ignores `private` methods and `constructors`. Works securely regardless of how developers name their instantiated variables.
 
-## 🏗️ Configuration
+-----
 
-Create a JSON file in your project to hold your selectors. The file must adhere to the standard schema:
+## 📦 Installation & Setup
 
-**`locators.json`**
+Install the package via your preferred package manager as a development dependency:
 
-```json
-{
-  "pages": [
-    {
-      "name": "HomePage",
-      "elements": [
-        {
-          "elementName": "search-input",
-          "selector": { "css": "input[name='search']" }
-        },
-        {
-          "elementName": "submit-button",
-          "selector": { "id": "btn-submit" }
-        },
-        {
-          "elementName": "login-button",
-          "selector": { "testid": "login-btn" }
-        },
-        {
-          "elementName": "nav-links",
-          "selector": { "role": "link" }
-        },
-        {
-          "elementName": "search-field",
-          "selector": { "placeholder": "Search..." }
-        },
-        {
-          "elementName": "close-button",
-          "selector": { "label": "Close" }
-        }
-      ]
-    },
-    {
-      "name": "ProductList",
-      "elements": [
-        {
-          "elementName": "product-cards",
-          "selector": { "xpath": "//article[@class='product']" }
-        }
-      ]
-    }
-  ]
-}
-
+```bash
+npm i -D @civitas-cerebrum/test-coverage
 ```
 
-### Supported Selector Keys
+### The Magic Init Command
 
-| Key | Resolves To | Example |
-|-----|-------------|---------|
-| `css` | `css=<value>` | `"css": "button.primary"` |
-| `xpath` | `xpath=<value>` | `"xpath": "//button[@id='submit']"` |
-| `id` | `#<value>` | `"id": "btn-submit"` |
-| `text` | `text=<value>` | `"text": "Submit"` |
-| `testid` | `[data-testid='<value>']` | `"testid": "login-btn"` |
-| `role` | `[role='<value>']` | `"role": "button"` |
-| `placeholder` | `[placeholder='<value>']` | `"placeholder": "Search..."` |
-| `label` | `[aria-label='<value>']` | `"label": "Close"` |
+You do not need to write any configuration files manually. Simply run the included initialization command:
 
-> **Note:** The `testid` key uses the standard `data-testid` attribute.
+```bash
+npx init-coverage
+```
+
+**What this does:**
+
+1.  Crawls your project looking for exported TypeScript classes.
+2.  Automatically generates `scripts/api-coverage.ts`.
+3.  Auto-wires all relative imports and configures the target arrays for you.
+
+-----
 
 ## 💻 Usage
 
-You can initialize the `ElementRepository` either by passing the **file path** to your JSON, or by passing the **parsed JSON object** directly.
+Because the generated file is a pure TypeScript script, you don't need a specific test runner (like Jest or Playwright) to execute it. You can run it directly using `tsx` or `ts-node`:
 
-### Initialization
-
-```typescript
-import { test } from '@playwright/test';
-import { ElementRepository } from '@civitas-cerebrum/element-repository';
-
-// Option A: Pass the path to your JSON (relative to your project root)
-const repo = new ElementRepository('tests/data/locators.json', 15000);
-
-// Option B: Import the JSON directly (requires resolveJsonModule in tsconfig)
-import locatorData from '../data/locators.json';
-const repo = new ElementRepository(locatorData, 15000);
-
+```bash
+npx tsx scripts/api-coverage.ts
 ```
 
-### Retrieving Elements
+### Adding to your `package.json`
 
-The repository exposes clean, asynchronous methods that return Playwright `Locator` objects, ready for interaction.
+For easy use in your CI/CD pipelines, add it to your package scripts:
 
-```typescript
-test('Search and select random product', async ({ page }) => {
-  await page.goto('/');
-
-  // 1. Get a standard element
-  const searchInput = await repo.get(page, 'HomePage', 'search-input');
-  await searchInput.fill('Trousers');
-
-  const submitBtn = await repo.get(page, 'HomePage', 'submit-button');
-  await submitBtn.click();
-
-  // 2. Select a random element from a list
-  const randomProduct = await repo.getRandom(page, 'ProductList', 'product-cards');
-  await randomProduct?.click();
-
-  // 3. Find a specific element by text within a list
-  const specificProduct = await repo.getByText(page, 'ProductList', 'product-cards', 'Blue Chinos');
-  await specificProduct?.click();
-
-  // 4. Find an element by HTML attribute
-  const activeCard = await repo.getByAttribute(page, 'ProductList', 'product-cards', 'data-status', 'active');
-  await activeCard?.click();
-
-  // 5. Get a specific element by index
-  const thirdProduct = await repo.getByIndex(page, 'ProductList', 'product-cards', 2);
-  await thirdProduct?.click();
-
-  // 6. Get the first visible element (filters out hidden duplicates)
-  const visibleModal = await repo.getVisible(page, 'HomePage', 'modal');
-  await visibleModal?.click();
-
-  // 7. Filter elements by ARIA role
-  const navLink = await repo.getByRole(page, 'HomePage', 'nav-links', 'link');
-  await navLink?.click();
-});
-
+```json
+"scripts": {
+  "coverage:api": "tsx scripts/api-coverage.ts"
+}
 ```
 
-## 🛠️ API Reference
+Now you can run `npm run coverage:api` anytime to generate a fresh `api-coverage-report.txt` and see if any dead code has accumulated in your framework\!
 
-### `get(page, pageName, elementName)`
+-----
 
-Returns a single Playwright Locator. Waits for the selector to attach to the DOM based on your configured timeout.
+## 🛑 Disabling or Removing
 
-### `getAll(page, pageName, elementName)`
+### Temporarily Disable
 
-Returns an array of resolved Locator handles (`Locator[]`). Useful when you need to iterate over multiple elements.
+If you are doing heavy refactoring and don't want to see the coverage warnings in your CI logs, simply remove the `npm run coverage:api` step from your pipeline configuration.
 
-### `getRandom(page, pageName, elementName, strict?)`
+### Complete Removal
 
-Counts the matching elements and randomly selects one. Safely waits for the specific randomized element to become visible.
+To completely remove the coverage reporter from your project:
 
-### `getByText(page, pageName, elementName, desiredText, strict?)`
+1.  Delete the generated `scripts/api-coverage.ts` file.
+2.  Delete any generated `api-coverage-report.txt` files.
+3.  Uninstall the package:
+    ```bash
+    npm uninstall @civitas-cerebrum/test-coverage
+    ```
 
-Returns the first Locator matching the mapped selector that also contains the `desiredText`.
+-----
 
-### `getByAttribute(page, pageName, elementName, attribute, value, options?)`
+## 🛠️ Advanced API Reference
 
-Returns the first Locator whose HTML attribute matches the given value. Iterates through all matching elements and checks the specified attribute.
+If you want to manually tweak the auto-generated `scripts/api-coverage.ts` file, here is the API reference for the core runner.
 
-**Options:**
-- `exact` (boolean, default: `true`) — If `true`, requires an exact attribute match. If `false`, matches when the attribute contains the value.
-- `strict` (boolean, default: `false`) — If `true`, throws an error when no matching element is found.
+### `generateApiCoverage(options)`
 
-```typescript
-// Exact match (default)
-const active = await repo.getByAttribute(page, 'Dashboard', 'cards', 'data-status', 'active');
+Executes synchronously and returns a `CoverageResult` object containing:
 
-// Partial (contains) match
-const dashLink = await repo.getByAttribute(page, 'Nav', 'links', 'href', '/dashboard', { exact: false });
-```
+  * `report`: The formatted string report.
+  * `uncoveredMethods`: An array of objects detailing which methods were missed.
+  * `reportPath`: The absolute path where the report was saved.
 
-### `getByIndex(page, pageName, elementName, index, strict?)`
+#### `options.testDirs` *(Required, `string[]`)*
 
-Returns the Locator at the specified zero-based index from the list of matching elements. Returns `null` (or throws in strict mode) if the index is out of bounds.
+An array of absolute directory paths. The runner will recursively search these folders for `.spec.ts` files to scan.
 
-```typescript
-const thirdCard = await repo.getByIndex(page, 'ProductList', 'product-cards', 2);
-```
+#### `options.reportOutputDir` *(Required, `string`)*
 
-### `getVisible(page, pageName, elementName, strict?)`
+The absolute path to the directory where the coverage text file should be written.
 
-Returns the first visible element matching the selector. Unlike `get()`, which returns the locator after a basic wait, this method explicitly filters to only visible elements — useful when hidden duplicates exist in the DOM.
+#### `options.targets` *(Required, `CoverageTarget[]`)*
 
-```typescript
-const visibleModal = await repo.getVisible(page, 'Dashboard', 'modal');
-```
+An array of configurations dictating which classes to analyze.
 
-### `getByRole(page, pageName, elementName, role, strict?)`
+  * `category` *(string)*: A grouping name for the final report (e.g., "PageObjects", "APIHelpers").
+  * `tier` *('primary' | 'advanced')*: Determines which visual block of the report the class is grouped under.
+  * `classRef` *(any)*: The actual class reference. *Note: Pass the class itself, not an instantiated object.*
 
-Filters elements by their explicit `role` HTML attribute and returns the first match.
+#### `options.ignorePatterns` *(Optional, `string[]`)*
 
-```typescript
-const navButton = await repo.getByRole(page, 'Header', 'navItems', 'button');
-```
+An array of substrings used to filter out files. If a scanned filename contains any of these strings, it will be skipped. Useful for ignoring the coverage script itself.
 
-### `getSelector(pageName, elementName)`
+#### `options.reportFileName` *(Optional, `string`)*
 
-Returns the raw string selector mapped to the given element (e.g., `"css=input[name='search']"` or `"xpath=//div"`). This is a synchronous method primarily useful for debugging, custom logging, or passing raw selector strings directly into native Playwright APIs that require strings instead of Locator objects.
-
-### `setDefaultTimeout(timeout)`
-
-Updates the default timeout (in milliseconds) for all subsequent element retrievals.
+Overrides the default output filename. Defaults to `"api-coverage-report.txt"`.
