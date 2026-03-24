@@ -535,7 +535,6 @@ export class ApiCoverageReporter {
     return isSuccess;
   }
 }
-
 export function generateGithubPlainComment(
   results: CoverageResult[],
   options: { threshold?: number } = {}
@@ -564,6 +563,7 @@ export function generateGithubPlainComment(
     return `**${cls}: ${clsCovered}/${methods.length}**\n${methodLines}`;
   }).join('\n\n');
 
+  // Updated Status Logic
   const status = passed
     ? `Build Passed: ${pct.toFixed(0)}% API Coverage!`
     : `Build Failed: coverage ${pct.toFixed(1)}% is below threshold ${threshold}%`;
@@ -577,7 +577,7 @@ export function generateGithubPlainComment(
     `${status}`,
     `\n`,
     `<details>`,
-    `<summary>🔍 View Detailed Coverage Info</summary>`,
+    `<summary>🔍 View Detailed Coverage Breakdown</summary>`,
     `\n`,
     classLines,
     `\n`,
@@ -598,7 +598,6 @@ export function generateGithubTableComment(
   const passed = pct >= threshold;
 
   const color = passed ? 'brightgreen' : pct >= 60 ? 'yellow' : 'red';
-
   const badge = `![API Coverage](https://img.shields.io/badge/API%20Coverage-${pct.toFixed(1)}%25-${color})`;
 
   const grouped = results.reduce<Record<string, CoverageResult[]>>((acc, r) => {
@@ -608,19 +607,15 @@ export function generateGithubTableComment(
 
   const tableRows = Object.keys(grouped).sort().map(cls => {
     const methods = grouped[cls];
-
     const coveredMethods = methods.filter(m => m.covered).map(m => `\`${m.methodName}\``);
     const uncoveredMethods = methods.filter(m => !m.covered).map(m => `\`${m.methodName}\``);
-
-    const coveredString = coveredMethods.join(', ');
-    const uncoveredString = uncoveredMethods.join(', ');
-
-    return `| **${cls}** | ${coveredMethods.length}/${methods.length} | ${uncoveredString} | ${coveredString} |`;
+    return `| **${cls}** | ${coveredMethods.length}/${methods.length} | ${uncoveredMethods.join(', ')} | ${coveredMethods.join(', ')} |`;
   }).join('\n');
 
+  // Updated Status Logic
   const status = passed
-    ? `**Build Passed:** 🎉 ${pct.toFixed(1)}% API Coverage (Threshold: ${threshold}%)`
-    : `**Build Failed:** ❌ Coverage ${pct.toFixed(1)}% is below the required threshold of ${threshold}%`;
+    ? `Build Passed: ${pct.toFixed(0)}% API Coverage!`
+    : `Build Failed: coverage ${pct.toFixed(1)}% is below threshold ${threshold}%`;
 
   return [
     ``,
