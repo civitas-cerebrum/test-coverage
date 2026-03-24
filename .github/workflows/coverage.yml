@@ -38,8 +38,8 @@ jobs:
             
             // 1. Configuration Enum/Mapping
             const config = {
-              table: { flag: 'github-table', header: 'Table Report', cmd: 'npm run test:coverage' },
-              plain: { flag: 'github-plain', header: 'Plain Report', cmd: 'npm run test:coverage:plain' }
+              table: { flag: 'github-table', header: 'Table report', cmd: 'npm run test:coverage' },
+              plain: { flag: 'github-plain', header: 'Plain report', cmd: 'npm run test:coverage:plain' }
             }[process.env.REPORT_FORMAT];
 
             // 2. Generate the report
