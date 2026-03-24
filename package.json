@@ -12,7 +12,7 @@
     "build": "tsc && node scripts/fix-shebang.js",
     "postbuild": "chmod +x dist/cli.js",
     "test": "jest",
-    "test:coverage": "npx test-coverage --format github",
+    "test:coverage": "npx test-coverage --format github-table",
     "test:coverage:plain": "npx test-coverage --format github-plain",
     "prepublishOnly": "npm run clean && npm run build && npm test"
   },
