@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as ts from 'typescript';
-import * as glob from 'glob'; // add "glob" to your dependencies
+import * as glob from 'glob';
 import { prettyOutput } from './pretty-output';
 
 export interface ApiCoverageOptions {
@@ -9,8 +9,9 @@ export interface ApiCoverageOptions {
   srcDir?: string;
   testDir?: string;
   ignorePaths?: string[];
-  outputFormat?: 'text' | 'json' | 'html' | 'badge' | 'github' | 'pretty';
+  outputFormat?: 'text' | 'json' | 'html' | 'badge' | 'github' | 'github-plain' | 'github-table' | 'pretty';
   debug?: boolean;
+  threshold?: number;
 }
 
 type ApiIndex = Map<string, Set<string>>;
@@ -27,8 +28,9 @@ export class ApiCoverageReporter {
   private srcDir: string;
   private testDir: string;
   private ignorePaths: string[];
-  private outputFormat?: 'text' | 'json' | 'html' | 'badge' | 'github' | 'pretty';
+  private outputFormat?: 'text' | 'json' | 'html' | 'badge' | 'github' | 'github-plain' | 'github-table' | 'pretty';
   private debug: boolean;
+  private threshold: number;
 
   constructor(options: ApiCoverageOptions = {}) {
     this.rootDir = options.rootDir || process.cwd();
@@ -37,6 +39,7 @@ export class ApiCoverageReporter {
     this.ignorePaths = options.ignorePaths || ['node_modules', 'dist'];
     this.outputFormat = options.outputFormat || 'text';
     this.debug = options.debug ?? false;
+    this.threshold = options.threshold ?? 100;
   }
 
   // -----------------------------
@@ -60,9 +63,6 @@ export class ApiCoverageReporter {
       path.dirname(configPath)
     );
 
-    // FIX 1: Explicitly collect all test files and add them to rootNames.
-    // tsconfig.json often excludes test directories, so the TypeChecker
-    // would have no type info for test files — causing 0% coverage.
     const testGlob = path.join(this.testDir, '**/*.{spec,test}.ts').replace(/\\/g, '/');
     const testFiles = glob.sync(testGlob);
 
@@ -218,7 +218,6 @@ export class ApiCoverageReporter {
       return false;
     };
 
-    // FIX 3: Walk a type and all its base types looking for a class match.
     const matchTypeHierarchy = (type: ts.Type, methodName: string): boolean => {
       const symbol = checker.getApparentType(type).getSymbol();
       if (!symbol) return false;
@@ -229,7 +228,6 @@ export class ApiCoverageReporter {
         }
       }
 
-      // Walk base types (handles inheritance)
       if (type.isClassOrInterface()) {
         for (const base of checker.getBaseTypes(type as ts.InterfaceType)) {
           if (matchTypeHierarchy(base, methodName)) return true;
@@ -244,7 +242,6 @@ export class ApiCoverageReporter {
         if (ts.isPropertyAccessExpression(node.expression)) {
           const methodName = node.expression.name.getText().replace(/['"]/g, '');
 
-          // STRATEGY 1: Signature-based (most precise)
           const signature = checker.getResolvedSignature(node);
           const decl = signature?.getDeclaration();
 
@@ -258,7 +255,6 @@ export class ApiCoverageReporter {
             }
           }
 
-          // STRATEGY 2: Type-based with full hierarchy traversal (FIX 2)
           const obj = node.expression.expression;
           const type = checker.getTypeAtLocation(obj);
 
@@ -267,10 +263,6 @@ export class ApiCoverageReporter {
             return;
           }
 
-          // FIX 4: STRATEGY 3 — name-based fallback.
-          // When the TypeChecker can't resolve the type (mocks, `as any`, etc.)
-          // we fall back to matching purely by method name across all known classes.
-          // This may produce false positives but prevents silent 0% coverage.
           for (const [className, methods] of apiIndex.entries()) {
             if (methods.has(methodName)) {
               if (this.debug) {
@@ -340,17 +332,20 @@ export class ApiCoverageReporter {
     const covered = results.filter(r => r.covered).length;
     const uncovered = results.filter(r => !r.covered);
     const pct = total ? (covered / total) * 100 : 0;
+    
+    // Evaluate against the user-defined threshold
+    const isSuccess = pct >= this.threshold;
 
     // --- pretty ---
     if (this.outputFormat === 'pretty') {
       prettyOutput(results);
-      return uncovered.length === 0;
+      return isSuccess;
     }
 
     // --- json ---
     if (this.outputFormat === 'json') {
       const json = {
-        summary: { total, covered, percentage: pct },
+        summary: { total, covered, percentage: pct, threshold: this.threshold, passed: isSuccess },
         classes: Object.entries(
           results.reduce((acc, r) => {
             if (!acc[r.className]) acc[r.className] = [];
@@ -363,16 +358,12 @@ export class ApiCoverageReporter {
       const outPath = path.join(this.rootDir, 'test-coverage-report.json');
       fs.writeFileSync(outPath, JSON.stringify(json, null, 2), 'utf-8');
       console.log(JSON.stringify(json, null, 2));
-      return uncovered.length === 0;
+      return isSuccess;
     }
 
     // --- badge ---
     if (this.outputFormat === 'badge') {
-      const color =
-        pct === 100 ? 'brightgreen' :
-          pct >= 80 ? 'green' :
-            pct >= 60 ? 'yellow' :
-              pct >= 40 ? 'orange' : 'red';
+      const color = isSuccess ? 'brightgreen' : pct >= 60 ? 'yellow' : 'red';
       const label = 'API coverage';
       const value = `${pct.toFixed(1)}%`;
       const lw = 90, vw = 60, tw = lw + vw;
@@ -394,7 +385,7 @@ export class ApiCoverageReporter {
       const badgePath = path.join(this.rootDir, 'test-coverage-badge.svg');
       fs.writeFileSync(badgePath, svg, 'utf-8');
       console.log(`Badge written to ${badgePath}`);
-      return uncovered.length === 0;
+      return isSuccess;
     }
 
     // --- html ---
@@ -405,13 +396,13 @@ export class ApiCoverageReporter {
         return acc;
       }, {} as Record<string, CoverageResult[]>);
 
-      const barColor = pct === 100 ? '#1D9E75' : pct >= 60 ? '#BA7517' : '#E24B4A';
+      const barColor = isSuccess ? '#1D9E75' : '#E24B4A';
 
       const classRows = Object.keys(grouped).sort().map(cls => {
         const methods = grouped[cls];
         const clsCovered = methods.filter(m => m.covered).length;
         const clsPct = methods.length ? (clsCovered / methods.length) * 100 : 0;
-        const clsColor = clsPct === 100 ? '#1D9E75' : clsPct >= 60 ? '#BA7517' : '#E24B4A';
+        const clsColor = clsPct >= this.threshold ? '#1D9E75' : clsPct >= 60 ? '#BA7517' : '#E24B4A';
         const badges = methods.map(m =>
           `<span class="method ${m.covered ? 'covered' : 'uncovered'}">${m.methodName}</span>`
         ).join('');
@@ -467,7 +458,7 @@ export class ApiCoverageReporter {
     <span class="subtitle">Generated ${new Date().toISOString().slice(0, 10)}</span>
   </div>
   <div class="summary">
-    <div class="metric"><div class="metric-label">Coverage</div><div class="metric-value" style="color:${barColor}">${pct.toFixed(1)}%</div></div>
+    <div class="metric"><div class="metric-label">Coverage (Target: ${this.threshold}%)</div><div class="metric-value" style="color:${barColor}">${pct.toFixed(1)}%</div></div>
     <div class="metric"><div class="metric-label">Covered</div><div class="metric-value">${covered} / ${total}</div></div>
     <div class="metric"><div class="metric-label">Uncovered</div><div class="metric-value" style="color:${uncovered.length ? '#E24B4A' : '#1D9E75'}">${uncovered.length}</div></div>
   </div>
@@ -482,47 +473,24 @@ export class ApiCoverageReporter {
       const outPath = path.join(this.rootDir, 'test-coverage-report.html');
       fs.writeFileSync(outPath, html, 'utf-8');
       console.log(`HTML report written to ${outPath}`);
-      return uncovered.length === 0;
+      return isSuccess;
     }
 
     // --- github ---
-    if (this.outputFormat === 'github') {
-      const grouped = results.reduce((acc, r) => {
-        if (!acc[r.className]) acc[r.className] = [];
-        acc[r.className].push(r);
-        return acc;
-      }, {} as Record<string, CoverageResult[]>);
+    if (this.outputFormat === 'github' || this.outputFormat === 'github-plain' || this.outputFormat === 'github-table') {
+      const isTable = this.outputFormat === 'github-table';
+      
+      const comment = isTable 
+        ? generateGithubTableComment(results, { threshold: this.threshold })
+        : generateGithubPlainComment(results, { threshold: this.threshold });
 
-      const rows = Object.keys(grouped).sort().map(cls => {
-        const methods = grouped[cls];
-        const clsCovered = methods.filter(m => m.covered).length;
-        const uncoveredList = methods.filter(m => !m.covered).map(m => m.methodName).join(', ') || '—';
-        return `| \`${cls}\` | ${clsCovered}/${methods.length} | ${uncoveredList} |`;
-      }).join('\n');
-
-      const summary = [
-        `## 📊 API Coverage Report`,
-        ``,
-        `**Overall: ${pct.toFixed(1)}% (${covered}/${total})**`,
-        ``,
-        `| Class | Coverage | Uncovered methods |`,
-        `|---|---|---|`,
-        rows,
-      ].join('\n');
-
-      // 1. Write to GitHub Step Summary
       const summaryPath = process.env.GITHUB_STEP_SUMMARY;
-      if (summaryPath) {
-        fs.appendFileSync(summaryPath, summary, 'utf-8');
-      } else {
-        console.log(summary);
-      }
+      if (summaryPath) fs.appendFileSync(summaryPath, comment, 'utf-8');
+      else console.log(comment);
 
-      // 2. Write to an .md file so the PR comment step can pick it up
       const outPath = path.join(this.rootDir, 'test-coverage-report.md');
-      fs.writeFileSync(outPath, summary, 'utf-8');
-
-      return uncovered.length === 0;
+      fs.writeFileSync(outPath, comment, 'utf-8');
+      return isSuccess;
     }
 
     // --- text (default) ---
@@ -548,6 +516,8 @@ export class ApiCoverageReporter {
     lines.push(
       `OVERALL: ${covered}/${total} (${total ? ((covered / total) * 100).toFixed(1) : 0}%)`
     );
+    lines.push(`THRESHOLD: ${this.threshold}%`);
+    lines.push(`STATUS: ${isSuccess ? 'PASSED' : 'FAILED'}`);
 
     if (uncovered.length) {
       lines.push('\nUncovered:');
@@ -562,6 +532,106 @@ export class ApiCoverageReporter {
       'utf-8'
     );
 
-    return uncovered.length === 0;
+    return isSuccess;
   }
+}
+
+export function generateGithubPlainComment(
+  results: CoverageResult[],
+  options: { threshold?: number } = {}
+): string {
+  const { threshold = 80 } = options;
+
+  const total = results.length;
+  const covered = results.filter(r => r.covered).length;
+  const pct = total ? (covered / total) * 100 : 0;
+  const passed = pct >= threshold;
+
+  const color = passed ? 'brightgreen' : pct >= 60 ? 'yellow' : 'red';
+
+  const badge = `![API Coverage](https://img.shields.io/badge/API%20Coverage-${pct.toFixed(1)}%25-${color})`;
+
+  const grouped = results.reduce<Record<string, CoverageResult[]>>((acc, r) => {
+    (acc[r.className] ??= []).push(r);
+    return acc;
+  }, {});
+
+  const classLines = Object.keys(grouped).sort().map(cls => {
+    const methods = grouped[cls];
+    const clsCovered = methods.filter(m => m.covered).length;
+    const methodLines = methods
+      .map(m => `  ${m.covered ? '[x]' : '[ ]'} ${m.methodName}`)
+      .join('\n');
+    return `**${cls}: ${clsCovered}/${methods.length}**\n${methodLines}`;
+  }).join('\n\n');
+
+  const status = passed
+    ? `Build Passed: ${pct.toFixed(0)}% API Coverage!`
+    : `Build Failed: coverage ${pct.toFixed(1)}% is below threshold ${threshold}%`;
+
+  return [
+    ``,
+    `## 📊 API Coverage Report`,
+    `\n`,
+    `${badge}`,
+    ``,
+    classLines,
+    `\n`,
+    `${status}`,
+    `\n`,
+    `<sub>Generated by \`@civitas-cerebrum/api-coverage\` · ${new Date().toISOString().slice(0, 10)}</sub>`,
+  ].join('\n');
+}
+
+export function generateGithubTableComment(
+  results: CoverageResult[],
+  options: { threshold?: number } = {}
+): string {
+  const { threshold = 100 } = options;
+
+  const total = results.length;
+  const covered = results.filter(r => r.covered).length;
+  const pct = total ? (covered / total) * 100 : 0;
+  const passed = pct >= threshold;
+
+  const color = passed ? 'brightgreen' : pct >= 60 ? 'yellow' : 'red';
+
+  const badge = `![API Coverage](https://img.shields.io/badge/API%20Coverage-${pct.toFixed(1)}%25-${color})`;
+
+  const grouped = results.reduce<Record<string, CoverageResult[]>>((acc, r) => {
+    (acc[r.className] ??= []).push(r);
+    return acc;
+  }, {});
+
+  const tableRows = Object.keys(grouped).sort().map(cls => {
+    const methods = grouped[cls];
+    
+    const coveredMethods = methods.filter(m => m.covered).map(m => `\`${m.methodName}\``);
+    const uncoveredMethods = methods.filter(m => !m.covered).map(m => `\`${m.methodName}\``);
+    
+    const coveredString = coveredMethods.join(', ');
+    const uncoveredString = uncoveredMethods.join(', ');
+    
+    return `| **${cls}** | ${coveredMethods.length}/${methods.length} | ${uncoveredString} | ${coveredString} |`;
+  }).join('\n');
+
+  const status = passed
+    ? `**Build Passed:** 🎉 ${pct.toFixed(1)}% API Coverage (Threshold: ${threshold}%)`
+    : `**Build Failed:** ❌ Coverage ${pct.toFixed(1)}% is below the required threshold of ${threshold}%`;
+
+  return [
+    ``,
+    `## 📊 API Coverage Report`,
+    `\n`,
+    `${badge}`,
+    `\n`,
+    `| Category | Coverage | Missing Coverage ❌ | Covered Methods ✅ |`,
+    `| :--- | :---: | :--- | :--- |`,
+    tableRows,
+    `\n`,
+    `---`,
+    `${status}`,
+    `\n`,
+    `<sub>Generated by \`@civitas-cerebrum/api-coverage\` · ${new Date().toISOString().slice(0, 10)}</sub>`,
+  ].join('\n');
 }
