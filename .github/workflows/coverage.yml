@@ -28,12 +28,12 @@ jobs:
 
       - name: 📊 Generate Table Report
         run: |
-          npm run test:coverage -- --format=github-table
+          npm run test:coverage 
           mv test-coverage-report.md table-report.md
 
       - name: 📊 Generate Plain Report
         run: |
-          npm run test:coverage:plain -- --format=github-plain
+          npm run test:coverage:plain
           mv test-coverage-report.md plain-report.md
 
       - name: 💬 Update PR Coverage Comment
