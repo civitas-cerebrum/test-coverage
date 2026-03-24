@@ -2,8 +2,7 @@
 
 [![NPM Version](https://img.shields.io/npm/v/@civitas-cerebrum/test-coverage?color=rgb(88%2C%20171%2C%2070))](https://www.npmjs.com/package/@civitas-cerebrum/test-coverage)
 
-> 🔍 **Zero-tolerance API coverage enforcement for TypeScript projects.**  
-> Uses TypeScript's compiler API (AST + type checker) to verify that every public method of every exported class is exercised in your test suite — at the static analysis level, before a single test runs.
+> 🔍 **Zero-tolerance API coverage enforcement for TypeScript projects.** > Uses TypeScript's compiler API (AST + type checker) to verify that every public method of every exported class is exercised in your test suite — at the static analysis level, before a single test runs.
 
 ---
 
@@ -14,7 +13,7 @@ The reporter runs in two passes over your TypeScript program:
 1. **API Indexing** — scans your `src/` directory, finds all exported classes, and catalogs their public non-constructor methods (including arrow function properties).
 2. **Call Detection** — scans your test files and uses the TypeScript type checker to find typed call expressions that resolve back to those methods. Three strategies are applied in order of precision: signature-based resolution → apparent type hierarchy traversal → name-based fallback for mocked/`as any` instances.
 
-If every method is called at least once, the process exits `0` ✅. Otherwise it exits `1` ❌, which fails your CI build.
+If your coverage percentage meets or exceeds your defined **threshold**, the process exits `0` ✅. Otherwise, it exits `1` ❌, failing your build.
 
 ---
 
@@ -31,10 +30,12 @@ npm install --save-dev @civitas-cerebrum/test-coverage
 ### CLI
 
 ```bash
+# Run with default settings (100% threshold)
 npx test-coverage
-```
 
-Reads `tsconfig.json` from the current directory, scans `src/` for the API surface, and checks `tests/` (plus any `*.spec.ts` / `*.test.ts` files) for coverage. Automatically uses the `pretty` format when run in an interactive terminal, and plain `text` when piped or run in CI.
+# Custom threshold and format
+npx test-coverage --threshold=85 --format=github-table
+```
 
 ### Programmatic
 
@@ -45,11 +46,12 @@ const reporter = new ApiCoverageReporter({
   rootDir: process.cwd(),
   srcDir: './src',
   testDir: './tests',
-  outputFormat: 'pretty',
+  outputFormat: 'github-table',
+  threshold: 85, // Fail build if below 85%
 });
 
-const allCovered = await reporter.runCoverageReport();
-process.exit(allCovered ? 0 : 1);
+const passed = await reporter.runCoverageReport();
+process.exit(passed ? 0 : 1);
 ```
 
 ### Options
@@ -59,8 +61,9 @@ process.exit(allCovered ? 0 : 1);
 | `rootDir` | `string` | `process.cwd()` | Project root (must contain `tsconfig.json`) |
 | `srcDir` | `string` | `<rootDir>/src` | Where exported classes live |
 | `testDir` | `string` | `<rootDir>/tests` | Where test files live |
+| `threshold` | `number` | `100` | Min percentage (0-100) required to pass the build |
 | `ignorePaths` | `string[]` | `['node_modules', 'dist']` | Path segments to skip during scanning |
-| `outputFormat` | `'pretty' \| 'text' \| 'json' \| 'html' \| 'badge' \| 'github'` | auto | See below |
+| `outputFormat` | `string` | auto | `pretty`, `text`, `json`, `html`, `badge`, `github-plain`, `github-table` |
 | `debug` | `boolean` | `false` | 🐛 Print file discovery and call-matching trace |
 
 ---
@@ -68,150 +71,48 @@ process.exit(allCovered ? 0 : 1);
 ## Output Formats
 
 ### 🎨 `pretty` (default in terminal)
+Colorized ANSI output with a progress bar and per-class breakdown. Automatically selected in interactive terminals.
 
-Colorized ANSI output with a progress bar, per-class breakdown, and pass/fail indicators. Automatically selected when running in an interactive terminal. Falls back to `text` when piped or run in CI.
+### 🐙 GitHub Formats
+Optimized for GitHub Actions Summaries and PR comments.
 
-```
-
- ╔═══════════════════════════════════════════════════╗
- ║                api coverage report                ║
- ╚═══════════════════════════════════════════════════╝
-
-  overall   ███████████████████░   97.4%   114 / 117
-
- ───────────────────────────────────────────────────
-
- DateUtilities                                 0 / 1
-   ✘  reformatDateString
-
- Extractions                                   6 / 6
-   ✔  getText
-   ✔  getAttribute
-   ✔  getAllTexts
-   ✔  getInputValue
-   ✔  getCount
-   ✔  getCssProperty
-
- Interactions                                20 / 20
-   ✔  click
-   ✔  clickWithoutScrolling
-   ✔  clickIfPresent
-   ✔  fill
-   ✔  uploadFile
-```
-
----
+* **`github-plain`** (or `github`): The classic list-based view with `[x]` checkboxes. Best for smaller APIs.
+* **`github-table`**: A high-density table view that groups covered and uncovered methods into compact cells. **Recommended for large projects** to avoid massive scrolling.
 
 ### 📄 `text`
-
-Plain-text summary printed to stdout and saved as `test-coverage-report.txt`. Best for piped output and environments that don't support ANSI.
-
-```
-=== API COVERAGE REPORT ===
-
-UserService: 3/4
-  [x] fetchUser
-  [x] createUser
-  [x] updateUser
-  [ ] deleteUser
-
-OVERALL: 3/4 (75.0%)
-
-Uncovered:
-  UserService.deleteUser
-```
-
----
+Plain-text summary saved as `test-coverage-report.txt`. Best for logs.
 
 ### 🗂️ `json`
-
-Machine-readable output saved as `test-coverage-report.json`. Suitable for ingestion by dashboards, custom reporters, or quality gates in other tools.
-
-```json
-{
-  "summary": { "total": 4, "covered": 3, "percentage": 75.0 },
-  "classes": [
-    {
-      "name": "UserService",
-      "methods": [
-        { "name": "fetchUser",  "covered": true },
-        { "name": "createUser", "covered": true },
-        { "name": "updateUser", "covered": true },
-        { "name": "deleteUser", "covered": false }
-      ]
-    }
-  ],
-  "uncovered": ["UserService.deleteUser"]
-}
-```
-
----
+Machine-readable output saved as `test-coverage-report.json`. Includes `summary.passed` boolean based on your threshold.
 
 ### 🌐 `html`
-
-A self-contained HTML report saved as `test-coverage-report.html`. Open it in any browser to get a visual breakdown: overall progress bar, per-class mini-bars, and color-coded method badges (🟢 covered, 🔴 uncovered).
-
-Useful for sharing coverage snapshots with teammates who don't have the repo checked out.
-
----
+A self-contained visual report saved as `test-coverage-report.html`. Includes an animated progress bar and color-coded method badges.
 
 ### 🏷️ `badge`
-
-Generates a shields.io-compatible SVG badge saved as `test-coverage-badge.svg`. Embed it directly in your README:
-
-```markdown
-![API Coverage](./test-coverage-badge.svg)
-```
-
-The badge color reflects coverage tier:
-
-| Coverage | Color |
-|---|---|
-| 100% | 🟢 brightgreen |
-| ≥ 80% | 🟩 green |
-| ≥ 60% | 🟡 yellow |
-| ≥ 40% | 🟠 orange |
-| < 40% | 🔴 red |
-
----
-
-### 🐙 `github`
-
-Writes a formatted Markdown summary to `$GITHUB_STEP_SUMMARY`, which renders as a table directly in the GitHub Actions run UI. It also saves a `test-coverage-report.md` file to your root directory, making it easy to pipe the results into a Pull Request comment. Falls back to console output if the environment variable is not set.
+Generates a shields.io-compatible SVG saved as `test-coverage-badge.svg`. The badge color automatically turns **red** if you are below your specified `threshold`.
 
 ---
 
 ## ⚙️ CI Integration
 
-### npm scripts
-
-```json
-{
-  "scripts": {
-    "test": "jest",
-    "coverage:api": "test-coverage",
-    "ci": "npm test && npm run coverage:api"
-  }
-}
-```
-
 ### GitHub Actions
 
 ```yaml
-- name: Run tests
-  run: npm test
-
 - name: Check API coverage
-  run: npx test-coverage
-  env:
-    OUTPUT_FORMAT: github
+  run: npx test-coverage --threshold=90 --format=github-table
+```
 
+### Uploading Reports
+
+```yaml
 - name: Upload HTML report
   if: always()
   uses: actions/upload-artifact@v4
   with:
     name: api-coverage-report
-    path: test-coverage-report.html
+    path: |
+      test-coverage-report.html
+      test-coverage-report.md
 ```
 
 ---
@@ -229,24 +130,11 @@ Writes a formatted Markdown summary to `$GITHUB_STEP_SUMMARY`, which renders as 
 ## 🐛 Debugging Zero Coverage
 
 If the API index builds correctly but coverage shows 0%, enable debug mode:
-
-```typescript
-new ApiCoverageReporter({ debug: true })
-```
+`npx test-coverage --debug`
 
 Common causes:
-
-- **Test files not found** — ensure they end in `.spec.ts` / `.test.ts` or live under `testDir`.
-- **`tsconfig.json` excludes tests** — the reporter automatically globs and adds test files to the TypeScript program, but verify your `testDir` path is correct.
-- **Heavily mocked instances (`as any`)** — the name-based fallback covers this, but check the debug output for `[name-only match]` lines.
-
----
-
-## Requirements
-
-- Node.js ≥ 18
-- TypeScript ≥ 5.0
-- A `tsconfig.json` in the project root
+- **Test files not found**: Ensure they end in `.spec.ts` / `.test.ts`.
+- **Heavily mocked instances (`as any`)**: The name-based fallback usually covers this, but check the debug output for `[name-only match]` lines.
 
 ---
 
