@@ -17,10 +17,10 @@ const reporter = new ApiCoverageReporter({ outputFormat });
 reporter.runCoverageReport()
   .then((isSuccess) => {
     if (!isSuccess) {
-      console.warn('\n❌ Build Failed: API coverage is not 100%.');
+      console.warn('\nBuild Failed: API coverage is not 100%.');
       process.exit(1);
     } else {
-      console.log('\n✅ Build Passed: 100% API Coverage verified.');
+      console.log('\nBuild Passed: 100% API Coverage!');
       process.exit(0);
     }
   })

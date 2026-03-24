@@ -501,7 +501,7 @@ export class ApiCoverageReporter {
       }).join('\n');
 
       const summary = [
-        `## API Coverage Report`,
+        `## 📊 API Coverage Report`,
         ``,
         `**Overall: ${pct.toFixed(1)}% (${covered}/${total})**`,
         ``,
@@ -510,12 +510,18 @@ export class ApiCoverageReporter {
         rows,
       ].join('\n');
 
+      // 1. Write to GitHub Step Summary
       const summaryPath = process.env.GITHUB_STEP_SUMMARY;
       if (summaryPath) {
         fs.appendFileSync(summaryPath, summary, 'utf-8');
       } else {
         console.log(summary);
       }
+
+      // 2. Write to an .md file so the PR comment step can pick it up
+      const outPath = path.join(this.rootDir, 'test-coverage-report.md');
+      fs.writeFileSync(outPath, summary, 'utf-8');
+
       return uncovered.length === 0;
     }
 
