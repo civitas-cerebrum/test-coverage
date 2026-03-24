@@ -33,14 +33,13 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            // 1. Generate the report
-            const exec = require('child_process').execSync;
-            exec('npm run test:coverage -- --format=github-table');
+            const cp = require('child_process');
             
+            // 1. Generate the report (renamed variable to 'cp' to avoid conflict)
+            cp.execSync('npm run test:coverage -- --format=github-table');
             const body = fs.readFileSync('test-coverage-report.md', 'utf-8');
 
-            // 2. Find existing TABLE comment 
-            // We check for the hidden tag but make sure it's NOT the plain list
+            // 2. Find and Update/Create Table comment
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -71,14 +70,13 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            // 1. Generate the report
-            const exec = require('child_process').execSync;
-            exec('npm run test:coverage:plain -- --format=github-plain');
+            const cp = require('child_process');
             
+            // 1. Generate the report
+            cp.execSync('npm run test:coverage:plain -- --format=github-plain');
             const body = fs.readFileSync('test-coverage-report.md', 'utf-8');
 
-            // 2. Find existing PLAIN comment
-            // We look specifically for the summary text we added to the reporter
+            // 2. Find and Update/Create Plain comment
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
