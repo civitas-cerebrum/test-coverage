@@ -22,70 +22,82 @@ jobs:
           cache: 'npm'
 
       - name: 🧩 Install & Build
+          # Ensure you build the package so the CLI is available
         run: |
           npm ci
           npm run build
 
-      - name: 📊 Run Unit Tests
-        run: npm run test
-
-      - name: 📊 Generate Table Report
-        run: |
-          npm run test:coverage -- --format=github-table
-          mv test-coverage-report.md table-report.md
-
-      - name: 📊 Generate Plain Report
-        run: |
-          npm run test:coverage:plain -- --format=github-plain
-          mv test-coverage-report.md plain-report.md
-
-      - name: 💬 Update PR Coverage Comment
-        uses: actions/github-script@v7
+      - name: 📊 Generate & Post Table Report
         if: always()
+        uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
+            // 1. Generate the report
+            const exec = require('child_process').execSync;
+            exec('npm run test:coverage -- --format=github-table');
             
-            // 1. Load the data from both files
-            const tableMd = fs.readFileSync('table-report.md', 'utf-8');
-            const plainMd = fs.readFileSync('plain-report.md', 'utf-8');
+            const body = fs.readFileSync('test-coverage-report.md', 'utf-8');
 
-            // 2. Combine them into one cohesive body
-            // We keep the hidden identifier from the Table report at the very top.
-            // We strip it from the Plain report to avoid duplicate internal tags.
-            const cleanPlainMd = plainMd.replace('', '');
-            
-            const body = [
-              tableMd,
-              '\n',
-              cleanPlainMd
-            ].join('\n');
-
-            // 3. Find the existing comment from the bot
+            // 2. Find existing TABLE comment 
+            // We check for the hidden tag but make sure it's NOT the plain list
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
             
-            const botComment = comments.find(c => 
+            const existing = comments.find(c => 
               c.user.login === 'github-actions[bot]' && 
-              c.body.includes('')
+              c.body.includes('') &&
+              !c.body.includes('View Detailed Plain List')
             );
 
-            // 4. Update or Create the comment
-            if (botComment) {
+            if (existing) {
               await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: botComment.id,
-                body: body
+                owner: context.repo.owner, repo: context.repo.repo,
+                comment_id: existing.id, body
               });
             } else {
               await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: body
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: context.issue.number, body
+              });
+            }
+
+      - name: 📊 Generate & Post Plain Report
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            // 1. Generate the report
+            const exec = require('child_process').execSync;
+            exec('npm run test:coverage:plain -- --format=github-plain');
+            
+            const body = fs.readFileSync('test-coverage-report.md', 'utf-8');
+
+            // 2. Find existing PLAIN comment
+            // We look specifically for the summary text we added to the reporter
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const existing = comments.find(c => 
+              c.user.login === 'github-actions[bot]' && 
+              c.body.includes('View Detailed Plain List')
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                comment_id: existing.id, body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: context.issue.number, body
               });
             }
