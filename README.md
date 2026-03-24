@@ -72,26 +72,32 @@ process.exit(allCovered ? 0 : 1);
 Colorized ANSI output with a progress bar, per-class breakdown, and pass/fail indicators. Automatically selected when running in an interactive terminal. Falls back to `text` when piped or run in CI.
 
 ```
- ╔═════════════════════════════════════════════╗
- ║         api coverage report                 ║
- ╚═════════════════════════════════════════════╝
 
- overall   ████████████████████░░░░░   84.6%   11 / 13
+ ╔═══════════════════════════════════════════════════╗
+ ║                api coverage report                ║
+ ╚═══════════════════════════════════════════════════╝
 
- ─────────────────────────────────────────────
+  overall   ███████████████████░   97.4%   114 / 117
 
- UserService                         3 / 4
-   ✔  fetchUser
-   ✔  createUser
-   ✔  updateUser
-   ✘  deleteUser
+ ───────────────────────────────────────────────────
 
- ─────────────────────────────────────────────
+ DateUtilities                                 0 / 1
+   ✘  reformatDateString
 
- ⚠  1 uncovered method:
-    UserService.deleteUser
+ Extractions                                   6 / 6
+   ✔  getText
+   ✔  getAttribute
+   ✔  getAllTexts
+   ✔  getInputValue
+   ✔  getCount
+   ✔  getCssProperty
 
- ✘  build failed — coverage is not 100%
+ Interactions                                20 / 20
+   ✔  click
+   ✔  clickWithoutScrolling
+   ✔  clickIfPresent
+   ✔  fill
+   ✔  uploadFile
 ```
 
 ---
