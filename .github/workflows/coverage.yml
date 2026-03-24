@@ -36,17 +36,14 @@ jobs:
             const fs = require('fs');
             const cp = require('child_process');
             
-            // 1. Configuration Enum/Mapping
             const config = {
-              table: { flag: 'github-table', header: 'Table report', cmd: 'npm run test:coverage' },
-              plain: { flag: 'github-plain', header: 'Plain report', cmd: 'npm run test:coverage:plain' }
+              table: { flag: 'github-table', header: 'Table report'},
+              plain: { flag: 'github-plain', header: 'Plain report' }
             }[process.env.REPORT_FORMAT];
 
-            // 2. Generate the report
-            cp.execSync(`${config.cmd} --format=${config.flag}`);
+            cp.execSync(`npx test-coverage --format=${config.flag}`);
             const body = fs.readFileSync('test-coverage-report.md', 'utf-8');
 
-            // 3. Find and Update/Create comment
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -81,11 +78,11 @@ jobs:
             const cp = require('child_process');
             
             const config = {
-              table: { flag: 'github-table', header: 'Table report', cmd: 'npm run test:coverage' },
-              plain: { flag: 'github-plain', header: 'Plain report', cmd: 'npm run test:coverage:plain' }
+              table: { flag: 'github-table', header: 'Table report'},
+              plain: { flag: 'github-plain', header: 'Plain report' }
             }[process.env.REPORT_FORMAT];
 
-            cp.execSync(`${config.cmd} --format=${config.flag}`);
+            cp.execSync(`npx test-coverage --format=${config.flag}`);
             const body = fs.readFileSync('test-coverage-report.md', 'utf-8');
 
             const { data: comments } = await github.rest.issues.listComments({

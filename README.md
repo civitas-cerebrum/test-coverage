@@ -54,6 +54,52 @@ const passed = await reporter.runCoverageReport();
 process.exit(passed ? 0 : 1);
 ```
 
+### Pipeline Script
+
+Add the following stage to your GitHub Actions pipeline.
+```yaml
+      - name: 📊 Generate & Post Table Report
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          REPORT_FORMAT: 'table'
+        with:
+          script: |
+            const fs = require('fs');
+            const cp = require('child_process');
+            
+            const config = {
+              table: { flag: 'github-table', header: 'Table report'},
+              plain: { flag: 'github-plain', header: 'Plain report' }
+            }[process.env.REPORT_FORMAT];
+
+            cp.execSync(`npx test-coverage --format=${config.flag}`);
+            const body = fs.readFileSync('test-coverage-report.md', 'utf-8');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const existing = comments.find(c => 
+              c.user.login === 'github-actions[bot]' && 
+              c.body.includes(config.header)
+            );
+
+            const commentPayload = {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            };
+
+            if (existing) {
+              await github.rest.issues.updateComment({ ...commentPayload, comment_id: existing.id });
+            } else {
+              await github.rest.issues.createComment({ ...commentPayload, issue_number: context.issue.number });
+            }
+```
+
 ### Options
 
 | Option | Type | Default | Description |
