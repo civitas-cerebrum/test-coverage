@@ -22,7 +22,6 @@ jobs:
           cache: 'npm'
 
       - name: 🧩 Install & Build
-          # Ensure you build the package so the CLI is available
         run: |
           npm ci
           npm run build
@@ -49,7 +48,7 @@ jobs:
             const existing = comments.find(c => 
               c.user.login === 'github-actions[bot]' && 
               c.body.includes('') &&
-              !c.body.includes('View Detailed Plain List')
+              !c.body.includes('View Detailed Coverage Breakdown')
             );
 
             if (existing) {
@@ -85,7 +84,7 @@ jobs:
             
             const existing = comments.find(c => 
               c.user.login === 'github-actions[bot]' && 
-              c.body.includes('View Detailed Plain List')
+              c.body.includes('View Detailed Coverage Breakdown')
             );
 
             if (existing) {
