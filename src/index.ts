@@ -619,7 +619,7 @@ export function generateGithubTableComment(
   }).join('\n');
 
   const status = passed
-    ? `**Build Passed:** 🎉 ${pct.toFixed(1)}% API Coverage (Threshold: ${threshold}%)`
+    ? `**Build Passed:** 🎉 ${pct.toFixed(1)}% API Coverage`
     : `**Build Failed:** ❌ Coverage ${pct.toFixed(1)}% is below the required threshold of ${threshold}%`;
 
   return [
