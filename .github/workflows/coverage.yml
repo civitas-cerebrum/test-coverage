@@ -43,7 +43,7 @@ jobs:
             }[process.env.REPORT_FORMAT];
 
             // 2. Generate the report
-            cp.execSync(`${config.cmd} -- --format=${config.flag}`);
+            cp.execSync(`${config.cmd} --format=${config.flag}`);
             const body = fs.readFileSync('test-coverage-report.md', 'utf-8');
 
             // 3. Find and Update/Create comment
@@ -85,7 +85,7 @@ jobs:
               plain: { flag: 'github-plain', header: 'Plain report', cmd: 'npm run test:coverage:plain' }
             }[process.env.REPORT_FORMAT];
 
-            cp.execSync(`${config.cmd} -- --format=${config.flag}`);
+            cp.execSync(`${config.cmd} --format=${config.flag}`);
             const body = fs.readFileSync('test-coverage-report.md', 'utf-8');
 
             const { data: comments } = await github.rest.issues.listComments({
