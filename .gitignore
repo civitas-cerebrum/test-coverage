@@ -3,3 +3,4 @@
 *.tgz
 /test-results
 *.txt
+/.idea

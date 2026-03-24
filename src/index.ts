@@ -488,7 +488,7 @@ export class ApiCoverageReporter {
       if (summaryPath) fs.appendFileSync(summaryPath, comment, 'utf-8');
       else console.log(comment);
 
-      const outPath = path.join(this.rootDir, 'test-coverage-report.txt');
+      const outPath = path.join(this.rootDir, 'test-coverage-report.md');
       fs.writeFileSync(outPath, comment, 'utf-8');
       return isSuccess;
     }

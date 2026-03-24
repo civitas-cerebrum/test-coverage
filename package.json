@@ -1,6 +1,6 @@
 {
   "name": "@civitas-cerebrum/test-coverage",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Checks if public methods of TypeScript classes are called in test files via AST analysis.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -12,6 +12,8 @@
     "build": "tsc && node scripts/fix-shebang.js",
     "postbuild": "chmod +x dist/cli.js",
     "test": "jest",
+    "test:coverage": "npx test-coverage --format github-table",
+    "test:coverage:plain": "npx test-coverage --format github-plain",
     "prepublishOnly": "npm run clean && npm run build && npm test"
   },
   "files": [
