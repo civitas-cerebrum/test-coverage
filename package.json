@@ -5,18 +5,20 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "test-coverage": "./dist/cli.js"
+    "test-coverage": "dist/cli.js"
   },
   "scripts": {
     "clean": "rm -rf dist",
-    "build": "npm run clean && tsc",
+    "build": "tsc && node scripts/fix-shebang.js",
+    "postbuild": "chmod +x dist/cli.js",
     "test": "jest",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run clean && npm run build && npm test"
   },
   "files": [
     "dist"
   ],
   "dependencies": {
+    "glob": "^10.4.5",
     "typescript": "^5.0.0"
   },
   "devDependencies": {

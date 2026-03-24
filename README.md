@@ -1,130 +1,249 @@
-# @civitas-cerebrum/test-coverage 🛡️
+# @civitas-cerebrum/test-coverage
 
 [![NPM Version](https://img.shields.io/npm/v/@civitas-cerebrum/test-coverage?color=rgb(88%2C%20171%2C%2070))](https://www.npmjs.com/package/@civitas-cerebrum/test-coverage)
 
-
-A lightweight, static-analysis tool for TypeScript projects that verifies if the public methods of your classes are being called inside your test files. 
-
-Stop wondering if you forgot to write a test for a new method. `@civitas-cerebrum/test-coverage` parses your TypeScript Abstract Syntax Tree (AST) to extract your classes and methods, then checks your test files to ensure every single public API is covered.
-
-## ✨ Features
-* **Zero Runtime Execution:** Uses static AST parsing. It doesn't need to run your code to know what your methods are.
-* **100% Coverage Enforcement:** Fails the build (exits with code `1`) if any public method is uncovered, making it perfect for CI/CD pipelines.
-* **Generates Reports:** Automatically outputs a clean `test-coverage-report.txt` file summarizing your coverage.
-* **Smart Filtering:** Automatically ignores `private`, `protected`, constructors, and internal methods (prefixed with `_`).
+> 🔍 **Zero-tolerance API coverage enforcement for TypeScript projects.**  
+> Uses TypeScript's compiler API (AST + type checker) to verify that every public method of every exported class is exercised in your test suite — at the static analysis level, before a single test runs.
 
 ---
 
-## 📦 Installation
+## How It Works
 
-It is recommended to install this as a development dependency in your project:
+The reporter runs in two passes over your TypeScript program:
 
-**Using npm:**
+1. **API Indexing** — scans your `src/` directory, finds all exported classes, and catalogs their public non-constructor methods (including arrow function properties).
+2. **Call Detection** — scans your test files and uses the TypeScript type checker to find typed call expressions that resolve back to those methods. Three strategies are applied in order of precision: signature-based resolution → apparent type hierarchy traversal → name-based fallback for mocked/`as any` instances.
+
+If every method is called at least once, the process exits `0` ✅. Otherwise it exits `1` ❌, which fails your CI build.
+
+---
+
+## Installation
+
 ```bash
 npm install --save-dev @civitas-cerebrum/test-coverage
 ```
 
-**Using yarn:**
-```bash
-yarn add -D @civitas-cerebrum/test-coverage
-```
-
 ---
 
-## 🚀 Usage
+## Usage
 
-### 1. Command Line (CLI)
-By default, the tool assumes your source code is in a `src/` directory and your tests are in a `tests/` directory.
-
-Run the tool directly using `npx`:
+### CLI
 
 ```bash
 npx test-coverage
 ```
 
-**Adding to your `package.json` scripts:**
-You can add it to your test pipeline to ensure coverage is checked automatically:
+Reads `tsconfig.json` from the current directory, scans `src/` for the API surface, and checks `tests/` (plus any `*.spec.ts` / `*.test.ts` files) for coverage. Automatically uses the `pretty` format when run in an interactive terminal, and plain `text` when piped or run in CI.
+
+### Programmatic
+
+```typescript
+import { ApiCoverageReporter } from '@civitas-cerebrum/test-coverage';
+
+const reporter = new ApiCoverageReporter({
+  rootDir: process.cwd(),
+  srcDir: './src',
+  testDir: './tests',
+  outputFormat: 'pretty',
+});
+
+const allCovered = await reporter.runCoverageReport();
+process.exit(allCovered ? 0 : 1);
+```
+
+### Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `rootDir` | `string` | `process.cwd()` | Project root (must contain `tsconfig.json`) |
+| `srcDir` | `string` | `<rootDir>/src` | Where exported classes live |
+| `testDir` | `string` | `<rootDir>/tests` | Where test files live |
+| `ignorePaths` | `string[]` | `['node_modules', 'dist']` | Path segments to skip during scanning |
+| `outputFormat` | `'pretty' \| 'text' \| 'json' \| 'html' \| 'badge' \| 'github'` | auto | See below |
+| `debug` | `boolean` | `false` | 🐛 Print file discovery and call-matching trace |
+
+---
+
+## Output Formats
+
+### 🎨 `pretty` (default in terminal)
+
+Colorized ANSI output with a progress bar, per-class breakdown, and pass/fail indicators. Automatically selected when running in an interactive terminal. Falls back to `text` when piped or run in CI.
+
+```
+ ╔═════════════════════════════════════════════╗
+ ║         api coverage report                 ║
+ ╚═════════════════════════════════════════════╝
+
+ overall   ████████████████████░░░░░   84.6%   11 / 13
+
+ ─────────────────────────────────────────────
+
+ UserService                         3 / 4
+   ✔  fetchUser
+   ✔  createUser
+   ✔  updateUser
+   ✘  deleteUser
+
+ ─────────────────────────────────────────────
+
+ ⚠  1 uncovered method:
+    UserService.deleteUser
+
+ ✘  build failed — coverage is not 100%
+```
+
+---
+
+### 📄 `text`
+
+Plain-text summary printed to stdout and saved as `test-coverage-report.txt`. Best for piped output and environments that don't support ANSI.
+
+```
+=== API COVERAGE REPORT ===
+
+UserService: 3/4
+  [x] fetchUser
+  [x] createUser
+  [x] updateUser
+  [ ] deleteUser
+
+OVERALL: 3/4 (75.0%)
+
+Uncovered:
+  UserService.deleteUser
+```
+
+---
+
+### 🗂️ `json`
+
+Machine-readable output saved as `test-coverage-report.json`. Suitable for ingestion by dashboards, custom reporters, or quality gates in other tools.
+
+```json
+{
+  "summary": { "total": 4, "covered": 3, "percentage": 75.0 },
+  "classes": [
+    {
+      "name": "UserService",
+      "methods": [
+        { "name": "fetchUser",  "covered": true },
+        { "name": "createUser", "covered": true },
+        { "name": "updateUser", "covered": true },
+        { "name": "deleteUser", "covered": false }
+      ]
+    }
+  ],
+  "uncovered": ["UserService.deleteUser"]
+}
+```
+
+---
+
+### 🌐 `html`
+
+A self-contained HTML report saved as `test-coverage-report.html`. Open it in any browser to get a visual breakdown: overall progress bar, per-class mini-bars, and color-coded method badges (🟢 covered, 🔴 uncovered).
+
+Useful for sharing coverage snapshots with teammates who don't have the repo checked out.
+
+---
+
+### 🏷️ `badge`
+
+Generates a shields.io-compatible SVG badge saved as `test-coverage-badge.svg`. Embed it directly in your README:
+
+```markdown
+![API Coverage](./test-coverage-badge.svg)
+```
+
+The badge color reflects coverage tier:
+
+| Coverage | Color |
+|---|---|
+| 100% | 🟢 brightgreen |
+| ≥ 80% | 🟩 green |
+| ≥ 60% | 🟡 yellow |
+| ≥ 40% | 🟠 orange |
+| < 40% | 🔴 red |
+
+---
+
+### 🐙 `github`
+
+Writes a formatted Markdown summary to `$GITHUB_STEP_SUMMARY`, which renders as a table directly in the GitHub Actions run UI — no artifacts or separate files needed. Falls back to `text` if the environment variable is not set.
+
+---
+
+## ⚙️ CI Integration
+
+### npm scripts
 
 ```json
 {
   "scripts": {
     "test": "jest",
-    "test:coverage": "test-coverage"
+    "coverage:api": "test-coverage",
+    "ci": "npm test && npm run coverage:api"
   }
 }
 ```
-Then run: `npm run test:coverage`
 
-### 2. Programmatic Usage (Custom Scripts)
-If you have a custom folder structure (e.g., your tests are in a `specs/` folder instead of `tests/`), you can use the package programmatically inside a custom Node script.
+### GitHub Actions
 
-Create a file called `check-coverage.ts`:
+```yaml
+- name: Run tests
+  run: npm test
+
+- name: Check API coverage
+  run: npx test-coverage
+  env:
+    OUTPUT_FORMAT: github
+
+- name: Upload HTML report
+  if: always()
+  uses: actions/upload-artifact@v4
+  with:
+    name: api-coverage-report
+    path: test-coverage-report.html
+```
+
+---
+
+## 🔎 What Gets Tracked
+
+| ✅ Included | ❌ Excluded |
+|---|---|
+| Public methods on exported classes | `private` / `protected` members |
+| Public arrow function properties | `constructor` |
+| Inherited public methods | Methods prefixed with `_` |
+
+---
+
+## 🐛 Debugging Zero Coverage
+
+If the API index builds correctly but coverage shows 0%, enable debug mode:
 
 ```typescript
-import { ApiCoverageReporter } from '@civitas-cerebrum/test-coverage';
-import * as path from 'path';
-
-const reporter = new ApiCoverageReporter({
-  rootDir: process.cwd(),
-  srcDir: path.resolve(process.cwd(), 'lib'),       // Custom source directory
-  testDir: path.resolve(process.cwd(), 'specs'),    // Custom test directory
-  ignoreTestPatterns: ['mock-data.ts']              // Ignore specific files
-});
-
-reporter.runCoverageReport()
-  .then((passed) => {
-    if (!passed) {
-      console.error('Coverage check failed!');
-      process.exit(1);
-    }
-    console.log('Coverage check passed!');
-  })
-  .catch(console.error);
+new ApiCoverageReporter({ debug: true })
 ```
+
+Common causes:
+
+- **Test files not found** — ensure they end in `.spec.ts` / `.test.ts` or live under `testDir`.
+- **`tsconfig.json` excludes tests** — the reporter automatically globs and adds test files to the TypeScript program, but verify your `testDir` path is correct.
+- **Heavily mocked instances (`as any`)** — the name-based fallback covers this, but check the debug output for `[name-only match]` lines.
 
 ---
 
-## 📊 Example Output
+## Requirements
 
-When run, the tool outputs a summary to your terminal and generates an `test-coverage-report.txt` file.
-
-```text
-========================================================
-                  API COVERAGE REPORT                    
-========================================================
-
-  MathUtils: 2/2 (100%)
-      [x] add
-      [x] subtract
-
-  StringUtils: 1/2 (50%)
-      [x] capitalize
-      [ ] reverseString
-
-========================================================
-  OVERALL: 3/4 methods (75.0%)
-========================================================
-
-  Uncovered methods (not in any test):
-    [ ] [StringUtils] reverseString
-
-❌ Build Failed: API coverage is not 100%.
-```
+- Node.js ≥ 18
+- TypeScript ≥ 5.0
+- A `tsconfig.json` in the project root
 
 ---
 
-## 🗑️ Removal / Uninstalling
+## License
 
-If you decide you no longer need the package, you can easily remove it:
-
-**Using npm:**
-```bash
-npm uninstall @civitas-cerebrum/test-coverage
-```
-
-**Using yarn:**
-```bash
-yarn remove @civitas-cerebrum/test-coverage
-```
-
-Make sure to also remove any `npx test-coverage` commands you may have added to your GitHub Actions or `package.json` scripts!
+MIT © [Umut Ay Bora](https://github.com/civitas-cerebrum)

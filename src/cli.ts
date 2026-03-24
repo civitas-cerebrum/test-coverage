@@ -1,9 +1,18 @@
 #!/usr/bin/env node
 import { ApiCoverageReporter } from './index';
 
-// You can easily add a library like 'commander' or 'yargs' here later 
-// to parse CLI flags (like --src, --tests). For now, we rely on defaults.
-const reporter = new ApiCoverageReporter();
+const args = process.argv.slice(2);
+const formatArg = args.find(a => a.startsWith('--format='))?.split('=')[1]
+               ?? args[args.indexOf('--format') + 1];
+
+const validFormats = ['pretty', 'text', 'json', 'html', 'badge', 'github'];
+
+const outputFormat: any =
+  formatArg && validFormats.includes(formatArg)
+    ? formatArg
+    : process.stdout.isTTY ? 'pretty' : 'text';
+
+const reporter = new ApiCoverageReporter({ outputFormat });
 
 reporter.runCoverageReport()
   .then((isSuccess) => {
