@@ -577,7 +577,7 @@ export function generateGithubPlainComment(
     `${status}`,
     `\n`,
     `<details>`,
-    `<summary>🔍 View Detailed Coverage Info</summary>`,
+    `<summary>🔍 View Detailed Coverage Breakdown</summary>`,
     `\n`,
     classLines,
     `\n`,
