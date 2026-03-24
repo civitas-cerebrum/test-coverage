@@ -26,68 +26,75 @@ jobs:
           npm ci
           npm run build
 
-      - name: 📊 Generate Table Report
-        run: |
-          npm run test:coverage 
-          mv test-coverage-report.md table-report.md
-
-      - name: 📊 Generate Plain Report
-        run: |
-          npm run test:coverage:plain
-          mv test-coverage-report.md plain-report.md
-
-      - name: 💬 Update PR Coverage Comment
-        uses: actions/github-script@v7
+      - name: 📊 Generate & Post Table Report
         if: always()
+        uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
+            const cp = require('child_process');
             
-            // 1. Load the data
-            const tableMd = fs.readFileSync('table-report.md', 'utf-8');
-            const plainMd = fs.readFileSync('plain-report.md', 'utf-8');
+            // 1. Generate the report (renamed variable to 'cp' to avoid conflict)
+            cp.execSync('npm run test:coverage -- --format=github-table');
+            const body = fs.readFileSync('test-coverage-report.md', 'utf-8');
 
-            // 2. Build the body - using a template that ensures MD renders correctly
-            // We strip the hidden HTML tag from the second file to keep the body unique
-            const cleanPlainMd = plainMd.replace('', '');
-            
-            const body = [
-              tableMd,
-              '',
-              '<details>',
-              '<summary>🔍 View Detailed Plain List</summary>',
-              '<br/>',
-              '',
-              cleanPlainMd,
-              '</details>'
-            ].join('\n');
-
-            // 3. Find the existing comment
-            // We look specifically for the bot's login and our unique hidden tag
+            // 2. Find and Update/Create Table comment
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
             
-            const botComment = comments.find(c => 
+            const existing = comments.find(c => 
               c.user.login === 'github-actions[bot]' && 
-              c.body.includes('')
+              c.body.includes('') &&
+              !c.body.includes('View Detailed Coverage Breakdown')
             );
 
-            // 4. Update or Create
-            if (botComment) {
+            if (existing) {
               await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: botComment.id,
-                body: body
+                owner: context.repo.owner, repo: context.repo.repo,
+                comment_id: existing.id, body
               });
             } else {
               await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: body
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: context.issue.number, body
+              });
+            }
+
+      - name: 📊 Generate & Post Plain Report
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const cp = require('child_process');
+            
+            // 1. Generate the report
+            cp.execSync('npm run test:coverage:plain -- --format=github-plain');
+            const body = fs.readFileSync('test-coverage-report.md', 'utf-8');
+
+            // 2. Find and Update/Create Plain comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const existing = comments.find(c => 
+              c.user.login === 'github-actions[bot]' && 
+              c.body.includes('View Detailed Coverage Breakdown')
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                comment_id: existing.id, body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: context.issue.number, body
               });
             }
