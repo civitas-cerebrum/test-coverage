@@ -177,7 +177,7 @@ The badge color reflects coverage tier:
 
 ### 🐙 `github`
 
-Writes a formatted Markdown summary to `$GITHUB_STEP_SUMMARY`, which renders as a table directly in the GitHub Actions run UI — no artifacts or separate files needed. Falls back to `text` if the environment variable is not set.
+Writes a formatted Markdown summary to `$GITHUB_STEP_SUMMARY`, which renders as a table directly in the GitHub Actions run UI. It also saves a `test-coverage-report.md` file to your root directory, making it easy to pipe the results into a Pull Request comment. Falls back to console output if the environment variable is not set.
 
 ---
 
