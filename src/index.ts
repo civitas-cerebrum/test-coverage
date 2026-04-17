@@ -11,6 +11,7 @@ import {
   OutputFormat,
 } from './types';
 import { createProgram, isIgnored, isSourceFile, isTestFile, ProgramContext } from './program';
+import { buildApiIndex } from './api-index';
 
 export class ApiCoverageReporter {
   private rootDir: string;
@@ -30,96 +31,6 @@ export class ApiCoverageReporter {
     this.outputFormat = options.outputFormat || 'text';
     this.debug = options.debug ?? false;
     this.threshold = options.threshold ?? 100;
-  }
-
-  // -----------------------------
-  // Extract API (class + methods)
-  // -----------------------------
-  private buildApiIndex(program: ts.Program): ApiIndex {
-    const apiIndex: ApiIndex = new Map();
-
-    for (const sourceFile of program.getSourceFiles()) {
-      const filePath = sourceFile.fileName;
-
-      if (sourceFile.isDeclarationFile) continue;
-      if (!isSourceFile(this.ctx, filePath)) continue;
-      if (isIgnored(this.ctx, filePath)) continue;
-
-      const visit = (node: ts.Node) => {
-        if (ts.isClassDeclaration(node) && node.name) {
-          const isExported = node.modifiers?.some(
-            m => m.kind === ts.SyntaxKind.ExportKeyword
-          );
-
-          if (!isExported) return;
-
-          const className = node.name.text;
-          const methods = new Set<string>();
-
-          node.members.forEach(member => {
-            let methodName: string | null = null;
-
-            if (ts.isMethodDeclaration(member) && member.name) {
-              methodName = member.name.getText(sourceFile);
-            }
-
-            if (
-              ts.isPropertyDeclaration(member) &&
-              member.name &&
-              member.initializer &&
-              ts.isArrowFunction(member.initializer)
-            ) {
-              methodName = member.name.getText(sourceFile);
-            }
-
-            if (!methodName) return;
-
-            const isPrivate = this.hasNonPublicModifier(member);
-            const isConstructor = methodName === 'constructor';
-            const isInternal = methodName.startsWith('_');
-
-            if (!isPrivate && !isConstructor && !isInternal) {
-              methods.add(methodName);
-            }
-          });
-
-          if (methods.size > 0) {
-            apiIndex.set(className, methods);
-          }
-        }
-
-        ts.forEachChild(node, visit);
-      };
-
-      visit(sourceFile);
-    }
-
-    if (this.debug) {
-      console.log(`[debug] API index built: ${apiIndex.size} classes`);
-      apiIndex.forEach((methods, cls) =>
-        console.log(`[debug]   ${cls}: [${[...methods].join(', ')}]`)
-      );
-    }
-
-    return apiIndex;
-  }
-
-  private hasNonPublicModifier(member: ts.ClassElement): boolean {
-    if (
-      ts.isMethodDeclaration(member) ||
-      ts.isPropertyDeclaration(member) ||
-      ts.isConstructorDeclaration(member) ||
-      ts.isGetAccessorDeclaration(member) ||
-      ts.isSetAccessorDeclaration(member)
-    ) {
-      return !!member.modifiers?.some(
-        m =>
-          m.kind === ts.SyntaxKind.PrivateKeyword ||
-          m.kind === ts.SyntaxKind.ProtectedKeyword
-      );
-    }
-
-    return false;
   }
 
   // -----------------------------
@@ -291,7 +202,7 @@ export class ApiCoverageReporter {
     const program = this.ctx.program;
     const checker = program.getTypeChecker();
 
-    const apiIndex = this.buildApiIndex(program);
+    const apiIndex = buildApiIndex(this.ctx);
     
     // Build the internal graph of what source methods call other source methods
     const callGraph = this.buildCallGraph(program, checker, apiIndex);
