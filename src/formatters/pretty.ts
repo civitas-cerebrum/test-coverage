@@ -1,3 +1,5 @@
+import { CoverageResult } from '../types';
+
 const BAR_WIDTH = 20;
 
 function bar(covered: number, total: number): string {
@@ -8,13 +10,7 @@ function bar(covered: number, total: number): string {
   return '█'.repeat(filled) + '░'.repeat(empty);
 }
 
-export interface CoverageResult {
-  className: string;
-  methodName: string;
-  covered: boolean;
-}
-
-export function prettyOutput(results: CoverageResult[]): void {
+export function formatPretty(results: CoverageResult[]): void {
   const total = results.length;
   const covered = results.filter(r => r.covered).length;
   const pct = total ? (covered / total) * 100 : 0;

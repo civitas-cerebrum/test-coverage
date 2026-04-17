@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as ts from 'typescript';
 import * as glob from 'glob';
-import { prettyOutput } from './pretty-output';
+import { formatPretty } from './formatters/pretty';
 import {
   ApiCoverageOptions,
   ApiIndex,
@@ -104,7 +104,7 @@ export class ApiCoverageReporter {
 
     // --- pretty ---
     if (this.outputFormat === 'pretty') {
-      prettyOutput(results);
+      formatPretty(results);
       return isSuccess;
     }
 
