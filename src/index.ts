@@ -13,6 +13,7 @@ import {
 import { createProgram, isIgnored, isSourceFile, isTestFile, ProgramContext } from './program';
 import { buildApiIndex } from './api-index';
 import { extractTypedCalls } from './call-detection';
+import { buildCallGraph, resolveTransitiveCalls } from './call-graph';
 
 export class ApiCoverageReporter {
   private rootDir: string;
@@ -35,77 +36,6 @@ export class ApiCoverageReporter {
   }
 
   // -----------------------------
-  // Transitive Call Graph
-  // -----------------------------
-  private buildCallGraph(
-    program: ts.Program,
-    checker: ts.TypeChecker,
-    apiIndex: ApiIndex
-  ): Map<MethodKey, Set<MethodKey>> {
-    const callGraph = new Map<MethodKey, Set<MethodKey>>();
-
-    // Initialize an empty set for every API method
-    apiIndex.forEach((methods, className) => {
-      methods.forEach(m => callGraph.set(`${className}.${m}` as MethodKey, new Set()));
-    });
-
-    // Scan source files to find internal dependencies
-    for (const sourceFile of program.getSourceFiles()) {
-      const filePath = sourceFile.fileName;
-
-      if (sourceFile.isDeclarationFile) continue;
-      if (!isSourceFile(this.ctx, filePath)) continue;
-      if (isIgnored(this.ctx, filePath)) continue;
-
-      const visit = (node: ts.Node) => {
-        let currentMethodKey: MethodKey | null = null;
-
-        // Check if we are inside a standard class method
-        if (ts.isMethodDeclaration(node) && node.name && node.parent && ts.isClassDeclaration(node.parent) && node.parent.name) {
-          const className = node.parent.name.text;
-          const methodName = node.name.getText(sourceFile);
-          if (apiIndex.has(className) && apiIndex.get(className)!.has(methodName)) {
-            currentMethodKey = `${className}.${methodName}` as MethodKey;
-          }
-        } 
-        // Check if we are inside an arrow function property method
-        else if (ts.isPropertyDeclaration(node) && node.initializer && ts.isArrowFunction(node.initializer) && node.name && node.parent && ts.isClassDeclaration(node.parent) && node.parent.name) {
-          const className = node.parent.name.text;
-          const methodName = node.name.getText(sourceFile);
-          if (apiIndex.has(className) && apiIndex.get(className)!.has(methodName)) {
-            currentMethodKey = `${className}.${methodName}` as MethodKey;
-          }
-        }
-
-        if (currentMethodKey) {
-          // If we found an API method, extract all API calls made *inside* its body
-          const internalCalls = extractTypedCalls(node, sourceFile, checker, apiIndex, this.debug);
-          
-          const edges = callGraph.get(currentMethodKey)!;
-          internalCalls.forEach(call => {
-            if (call !== currentMethodKey) { // Avoid mapping a method to itself
-              edges.add(call);
-            }
-          });
-
-          // Stop traversing children here, because extractTypedCalls already handled the method body
-          return; 
-        }
-
-        ts.forEachChild(node, visit);
-      };
-
-      visit(sourceFile);
-    }
-
-    if (this.debug) {
-      console.log(`[debug] Internal call graph built. Ready for transitive resolution.`);
-    }
-
-    return callGraph;
-  }
-
-  // -----------------------------
   // Main Execution
   // -----------------------------
   public async runCoverageReport(): Promise<boolean> {
@@ -120,9 +50,9 @@ export class ApiCoverageReporter {
     const checker = program.getTypeChecker();
 
     const apiIndex = buildApiIndex(this.ctx);
-    
+
     // Build the internal graph of what source methods call other source methods
-    const callGraph = this.buildCallGraph(program, checker, apiIndex);
+    const callGraph = buildCallGraph(this.ctx, checker, apiIndex);
 
     const allMethods: MethodKey[] = [];
     apiIndex.forEach((methods, className) => {
@@ -133,7 +63,7 @@ export class ApiCoverageReporter {
       console.log(`[debug] total API methods to track: ${allMethods.length}`);
     }
 
-    const calledMethods = new Set<MethodKey>();
+    const directlyCalled = new Set<MethodKey>();
 
     // 1. Find DIRECT method calls from test files
     for (const sourceFile of program.getSourceFiles()) {
@@ -153,27 +83,11 @@ export class ApiCoverageReporter {
         console.log(`[debug]   found calls: ${[...calls].join(', ')}`);
       }
 
-      calls.forEach(c => calledMethods.add(c));
+      calls.forEach(c => directlyCalled.add(c));
     }
 
-    // 2. Transitive Closure Calculation (BFS)
-    // Now we take the directly called methods and resolve their internal calls
-    const queue = Array.from(calledMethods);
-    
-    while (queue.length > 0) {
-      const currentMethod = queue.shift()!;
-      const internalDependencies = callGraph.get(currentMethod);
-      
-      if (internalDependencies) {
-        for (const dependency of internalDependencies) {
-          // If we haven't tracked this internal call yet, track it and add it to the queue to check its dependencies too
-          if (!calledMethods.has(dependency)) {
-            calledMethods.add(dependency);
-            queue.push(dependency);
-          }
-        }
-      }
-    }
+    // 2. Transitive Closure Calculation
+    const calledMethods = resolveTransitiveCalls(directlyCalled, callGraph);
 
     const results: CoverageResult[] = allMethods.map(key => {
       const [className, methodName] = key.split('.');
