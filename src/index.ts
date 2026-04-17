@@ -12,6 +12,7 @@ import {
 } from './types';
 import { createProgram, isIgnored, isSourceFile, isTestFile, ProgramContext } from './program';
 import { buildApiIndex } from './api-index';
+import { extractTypedCalls } from './call-detection';
 
 export class ApiCoverageReporter {
   private rootDir: string;
@@ -31,90 +32,6 @@ export class ApiCoverageReporter {
     this.outputFormat = options.outputFormat || 'text';
     this.debug = options.debug ?? false;
     this.threshold = options.threshold ?? 100;
-  }
-
-  // -----------------------------
-  // Extract method calls (typed)
-  // -----------------------------
-  private extractTypedCalls(
-    nodeToScan: ts.Node,
-    sourceFile: ts.SourceFile,
-    checker: ts.TypeChecker,
-    apiIndex: ApiIndex
-  ): Set<MethodKey> {
-    const calls = new Set<MethodKey>();
-
-    const tryMatchClass = (className: string, methodName: string) => {
-      if (apiIndex.has(className) && apiIndex.get(className)!.has(methodName)) {
-        calls.add(`${className}.${methodName}` as MethodKey);
-        return true;
-      }
-      return false;
-    };
-
-    const matchTypeHierarchy = (type: ts.Type, methodName: string): boolean => {
-      const symbol = checker.getApparentType(type).getSymbol();
-      if (!symbol) return false;
-
-      for (const decl of symbol.getDeclarations() ?? []) {
-        if (ts.isClassDeclaration(decl) && decl.name) {
-          if (tryMatchClass(decl.name.text, methodName)) return true;
-        }
-      }
-
-      if (type.isClassOrInterface()) {
-        for (const base of checker.getBaseTypes(type as ts.InterfaceType)) {
-          if (matchTypeHierarchy(base, methodName)) return true;
-        }
-      }
-
-      return false;
-    };
-
-    const visit = (node: ts.Node) => {
-      if (ts.isCallExpression(node)) {
-        if (ts.isPropertyAccessExpression(node.expression)) {
-          const methodName = node.expression.name.getText().replace(/['"]/g, '');
-
-          const signature = checker.getResolvedSignature(node);
-          const decl = signature?.getDeclaration();
-
-          if (decl && ts.isMethodDeclaration(decl)) {
-            const parent = decl.parent;
-            if (ts.isClassDeclaration(parent) && parent.name) {
-              if (tryMatchClass(parent.name.text, methodName)) {
-                ts.forEachChild(node, visit);
-                return;
-              }
-            }
-          }
-
-          const obj = node.expression.expression;
-          const type = checker.getTypeAtLocation(obj);
-
-          if (matchTypeHierarchy(type, methodName)) {
-            ts.forEachChild(node, visit);
-            return;
-          }
-
-          for (const [className, methods] of apiIndex.entries()) {
-            if (methods.has(methodName)) {
-              if (this.debug) {
-                console.log(
-                  `[debug] name-only match: ${className}.${methodName} in ${sourceFile.fileName}`
-                );
-              }
-              calls.add(`${className}.${methodName}` as MethodKey);
-            }
-          }
-        }
-      }
-
-      ts.forEachChild(node, visit);
-    };
-
-    visit(nodeToScan);
-    return calls;
   }
 
   // -----------------------------
@@ -162,7 +79,7 @@ export class ApiCoverageReporter {
 
         if (currentMethodKey) {
           // If we found an API method, extract all API calls made *inside* its body
-          const internalCalls = this.extractTypedCalls(node, sourceFile, checker, apiIndex);
+          const internalCalls = extractTypedCalls(node, sourceFile, checker, apiIndex, this.debug);
           
           const edges = callGraph.get(currentMethodKey)!;
           internalCalls.forEach(call => {
@@ -230,7 +147,7 @@ export class ApiCoverageReporter {
         console.log(`[debug] scanning test file: ${filePath}`);
       }
 
-      const calls = this.extractTypedCalls(sourceFile, sourceFile, checker, apiIndex);
+      const calls = extractTypedCalls(sourceFile, sourceFile, checker, apiIndex, this.debug);
 
       if (this.debug && calls.size > 0) {
         console.log(`[debug]   found calls: ${[...calls].join(', ')}`);
