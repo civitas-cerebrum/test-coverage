@@ -69,3 +69,46 @@ describe('threshold defaults', () => {
     expect(out).toMatch(/threshold of 100%/);
   });
 });
+
+describe('github ordering', () => {
+  const mixed: CoverageResult[] = [
+    { className: 'AllCovered', methodName: 'a', covered: true },
+    { className: 'AllCovered', methodName: 'b', covered: true },
+    { className: 'OneMissing', methodName: 'a', covered: true },
+    { className: 'OneMissing', methodName: 'b', covered: false },
+    { className: 'TwoMissing', methodName: 'a', covered: false },
+    { className: 'TwoMissing', methodName: 'b', covered: false },
+  ];
+
+  it('plain comment lists classes with missing methods first', () => {
+    const out = generateGithubPlainComment(mixed, { threshold: 100 });
+    const twoIdx = out.indexOf('TwoMissing');
+    const oneIdx = out.indexOf('OneMissing');
+    const allIdx = out.indexOf('AllCovered');
+    expect(twoIdx).toBeGreaterThan(-1);
+    expect(oneIdx).toBeGreaterThan(-1);
+    expect(allIdx).toBeGreaterThan(-1);
+    expect(twoIdx).toBeLessThan(oneIdx);
+    expect(oneIdx).toBeLessThan(allIdx);
+  });
+
+  it('plain comment lists uncovered methods before covered within a class', () => {
+    const out = generateGithubPlainComment(mixed, { threshold: 100 });
+    // Inside "OneMissing": `[ ] b` should appear before `[x] a`
+    const classBlock = out.slice(out.indexOf('OneMissing'));
+    const missingIdx = classBlock.indexOf('[ ] b');
+    const coveredIdx = classBlock.indexOf('[x] a');
+    expect(missingIdx).toBeGreaterThan(-1);
+    expect(coveredIdx).toBeGreaterThan(-1);
+    expect(missingIdx).toBeLessThan(coveredIdx);
+  });
+
+  it('table comment lists classes with missing methods first', () => {
+    const out = generateGithubTableComment(mixed, { threshold: 100 });
+    const twoIdx = out.indexOf('**TwoMissing**');
+    const oneIdx = out.indexOf('**OneMissing**');
+    const allIdx = out.indexOf('**AllCovered**');
+    expect(twoIdx).toBeLessThan(oneIdx);
+    expect(oneIdx).toBeLessThan(allIdx);
+  });
+});

@@ -3,6 +3,7 @@ import {
   groupByClass,
   renderShieldsBadge,
   renderStatus,
+  sortClassesByMissingFirst,
 } from './shared';
 
 export function generateGithubPlainComment(
@@ -19,8 +20,11 @@ export function generateGithubPlainComment(
   const badge = renderShieldsBadge(pct, passed);
   const grouped = groupByClass(results);
 
-  const classLines = Object.keys(grouped).sort().map(cls => {
-    const methods = grouped[cls];
+  const classLines = sortClassesByMissingFirst(grouped).map(cls => {
+    const methods = [...grouped[cls]].sort((a, b) => {
+      if (a.covered !== b.covered) return a.covered ? 1 : -1;
+      return a.methodName.localeCompare(b.methodName);
+    });
     const clsCovered = methods.filter(m => m.covered).length;
     const methodLines = methods
       .map(m => `  ${m.covered ? '[x]' : '[ ]'} ${m.methodName}`)
@@ -62,7 +66,7 @@ export function generateGithubTableComment(
   const badge = renderShieldsBadge(pct, passed);
   const grouped = groupByClass(results);
 
-  const tableRows = Object.keys(grouped).sort().map(cls => {
+  const tableRows = sortClassesByMissingFirst(grouped).map(cls => {
     const methods = grouped[cls];
     const coveredMethods = methods.filter(m => m.covered).map(m => `\`${m.methodName}\``);
     const uncoveredMethods = methods.filter(m => !m.covered).map(m => `\`${m.methodName}\``);
