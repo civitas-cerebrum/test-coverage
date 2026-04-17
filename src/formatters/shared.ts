@@ -9,9 +9,17 @@ export function groupByClass(results: CoverageResult[]): GroupedResults {
   }, {});
 }
 
-export function renderShieldsBadge(pct: number, passed: boolean): string {
+export function renderShieldsBadge(pct: number, passed: boolean, linkUrl?: string): string {
   const color = passed ? 'brightgreen' : pct >= 60 ? 'yellow' : 'red';
-  return `![API Coverage](https://img.shields.io/badge/API%20Coverage-${pct.toFixed(1)}%25-${color})`;
+  const img = `![API Coverage](https://img.shields.io/badge/API%20Coverage-${pct.toFixed(1)}%25-${color})`;
+  return linkUrl ? `[${img}](${linkUrl})` : img;
+}
+
+export function getGithubRepoUrl(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const repo = env.GITHUB_REPOSITORY;
+  if (!repo) return undefined;
+  const server = env.GITHUB_SERVER_URL || 'https://github.com';
+  return `${server}/${repo}`;
 }
 
 export type StatusStyle = 'plain' | 'emoji';

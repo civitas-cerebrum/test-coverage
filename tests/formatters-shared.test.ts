@@ -1,4 +1,5 @@
 import {
+  getGithubRepoUrl,
   groupByClass,
   renderShieldsBadge,
   renderStatus,
@@ -76,5 +77,40 @@ describe('sortClassesByMissingFirst', () => {
       Alpha: [{ className: 'Alpha', methodName: 'a', covered: false }],
     };
     expect(sortClassesByMissingFirst(grouped)).toEqual(['Alpha', 'Bravo']);
+  });
+});
+
+describe('renderShieldsBadge with linkUrl', () => {
+  it('wraps the image in a markdown link when linkUrl is provided', () => {
+    const out = renderShieldsBadge(100, true, 'https://github.com/owner/repo');
+    expect(out.startsWith('[![API Coverage]')).toBe(true);
+    expect(out).toContain('(https://github.com/owner/repo)');
+  });
+
+  it('returns a plain image (no link) when linkUrl is omitted', () => {
+    const out = renderShieldsBadge(100, true);
+    expect(out.startsWith('![API Coverage]')).toBe(true);
+    expect(out).not.toContain('[![');
+  });
+});
+
+describe('getGithubRepoUrl', () => {
+  it('builds a github.com URL from GITHUB_REPOSITORY', () => {
+    expect(getGithubRepoUrl({ GITHUB_REPOSITORY: 'owner/repo' })).toBe(
+      'https://github.com/owner/repo',
+    );
+  });
+
+  it('respects a custom GITHUB_SERVER_URL (GHES)', () => {
+    expect(
+      getGithubRepoUrl({
+        GITHUB_REPOSITORY: 'owner/repo',
+        GITHUB_SERVER_URL: 'https://github.example.com',
+      }),
+    ).toBe('https://github.example.com/owner/repo');
+  });
+
+  it('returns undefined when GITHUB_REPOSITORY is absent', () => {
+    expect(getGithubRepoUrl({})).toBeUndefined();
   });
 });

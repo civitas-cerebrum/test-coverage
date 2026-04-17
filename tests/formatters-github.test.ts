@@ -112,3 +112,38 @@ describe('github ordering', () => {
     expect(oneIdx).toBeLessThan(allIdx);
   });
 });
+
+describe('github badge linking', () => {
+  const prevRepo = process.env.GITHUB_REPOSITORY;
+  const prevServer = process.env.GITHUB_SERVER_URL;
+
+  afterEach(() => {
+    if (prevRepo === undefined) delete process.env.GITHUB_REPOSITORY;
+    else process.env.GITHUB_REPOSITORY = prevRepo;
+    if (prevServer === undefined) delete process.env.GITHUB_SERVER_URL;
+    else process.env.GITHUB_SERVER_URL = prevServer;
+  });
+
+  it('plain comment wraps the badge with a repo link when GITHUB_REPOSITORY is set', () => {
+    process.env.GITHUB_REPOSITORY = 'owner/repo';
+    delete process.env.GITHUB_SERVER_URL;
+    const out = generateGithubPlainComment(results, { threshold: 100 });
+    expect(out).toContain('[![API Coverage]');
+    expect(out).toContain('](https://github.com/owner/repo)');
+  });
+
+  it('table comment wraps the badge with a repo link when GITHUB_REPOSITORY is set', () => {
+    process.env.GITHUB_REPOSITORY = 'owner/repo';
+    delete process.env.GITHUB_SERVER_URL;
+    const out = generateGithubTableComment(results, { threshold: 100 });
+    expect(out).toContain('[![API Coverage]');
+    expect(out).toContain('](https://github.com/owner/repo)');
+  });
+
+  it('falls back to a plain badge when GITHUB_REPOSITORY is absent', () => {
+    delete process.env.GITHUB_REPOSITORY;
+    const out = generateGithubPlainComment(results, { threshold: 100 });
+    expect(out).toContain('![API Coverage]');
+    expect(out).not.toContain('[![');
+  });
+});

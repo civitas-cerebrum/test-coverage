@@ -1,5 +1,6 @@
 import { CoverageResult } from '../types';
 import {
+  getGithubRepoUrl,
   groupByClass,
   renderShieldsBadge,
   renderStatus,
@@ -17,7 +18,7 @@ export function generateGithubPlainComment(
   const pct = total ? (covered / total) * 100 : 0;
   const passed = pct >= threshold;
 
-  const badge = renderShieldsBadge(pct, passed);
+  const badge = renderShieldsBadge(pct, passed, getGithubRepoUrl());
   const grouped = groupByClass(results);
 
   const classLines = sortClassesByMissingFirst(grouped).map(cls => {
@@ -63,7 +64,7 @@ export function generateGithubTableComment(
   const pct = total ? (covered / total) * 100 : 0;
   const passed = pct >= threshold;
 
-  const badge = renderShieldsBadge(pct, passed);
+  const badge = renderShieldsBadge(pct, passed, getGithubRepoUrl());
   const grouped = groupByClass(results);
 
   const tableRows = sortClassesByMissingFirst(grouped).map(cls => {
