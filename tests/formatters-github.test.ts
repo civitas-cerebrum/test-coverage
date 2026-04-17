@@ -34,3 +34,16 @@ describe('generateGithubTableComment', () => {
     expect(out).toContain('Bravo');
   });
 });
+
+describe('github footers', () => {
+  it('plain comment footer references the correct package name', () => {
+    const out = generateGithubPlainComment(results, { threshold: 100 });
+    expect(out).toContain('@civitas-cerebrum/test-coverage');
+    expect(out).not.toContain('@civitas-cerebrum/api-coverage');
+  });
+  it('table comment footer references the correct package name', () => {
+    const out = generateGithubTableComment(results, { threshold: 100 });
+    expect(out).toContain('@civitas-cerebrum/test-coverage');
+    expect(out).not.toContain('@civitas-cerebrum/api-coverage');
+  });
+});
