@@ -47,3 +47,25 @@ describe('github footers', () => {
     expect(out).not.toContain('@civitas-cerebrum/api-coverage');
   });
 });
+
+describe('threshold defaults', () => {
+  // 75% covered; threshold 80 → fail, threshold 100 → fail, but the status wording differs.
+  const mixed: CoverageResult[] = [
+    { className: 'A', methodName: 'x', covered: true },
+    { className: 'A', methodName: 'y', covered: true },
+    { className: 'A', methodName: 'z', covered: true },
+    { className: 'A', methodName: 'w', covered: false },
+  ];
+
+  it('generateGithubPlainComment defaults threshold to 100', () => {
+    const out = generateGithubPlainComment(mixed);
+    // With threshold 100, 75% fails and the message should reference 100%
+    expect(out).toMatch(/100/);
+    expect(out).not.toMatch(/threshold 80%/);
+  });
+
+  it('generateGithubTableComment defaults threshold to 100', () => {
+    const out = generateGithubTableComment(mixed);
+    expect(out).toMatch(/threshold of 100%/);
+  });
+});
