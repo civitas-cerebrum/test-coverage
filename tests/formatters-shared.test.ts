@@ -114,3 +114,51 @@ describe('getGithubRepoUrl', () => {
     expect(getGithubRepoUrl({})).toBeUndefined();
   });
 });
+
+describe('getGithubRepoUrl edge cases', () => {
+  it('treats empty GITHUB_REPOSITORY as unset', () => {
+    expect(getGithubRepoUrl({ GITHUB_REPOSITORY: '' })).toBeUndefined();
+  });
+
+  it('strips a trailing slash from GITHUB_SERVER_URL', () => {
+    expect(
+      getGithubRepoUrl({
+        GITHUB_REPOSITORY: 'owner/repo',
+        GITHUB_SERVER_URL: 'https://github.example.com/',
+      }),
+    ).toBe('https://github.example.com/owner/repo');
+  });
+
+  it('strips multiple trailing slashes from GITHUB_SERVER_URL', () => {
+    expect(
+      getGithubRepoUrl({
+        GITHUB_REPOSITORY: 'owner/repo',
+        GITHUB_SERVER_URL: 'https://github.example.com///',
+      }),
+    ).toBe('https://github.example.com/owner/repo');
+  });
+
+  it('does not split paths inside GITHUB_REPOSITORY (passes through verbatim)', () => {
+    expect(getGithubRepoUrl({ GITHUB_REPOSITORY: 'owner/repo/sub' })).toBe(
+      'https://github.com/owner/repo/sub',
+    );
+  });
+
+  it('does not validate the shape of GITHUB_REPOSITORY (bare name passes through)', () => {
+    expect(getGithubRepoUrl({ GITHUB_REPOSITORY: 'bare-name' })).toBe(
+      'https://github.com/bare-name',
+    );
+  });
+});
+
+describe('renderShieldsBadge link adjacency', () => {
+  it('places the opening bracket immediately before the image with no whitespace', () => {
+    const out = renderShieldsBadge(100, true, 'https://github.com/owner/repo');
+    expect(out).toMatch(/^\[!\[API Coverage\]/);
+  });
+
+  it('places the closing paren and link URL immediately after the image with no whitespace', () => {
+    const out = renderShieldsBadge(100, true, 'https://github.com/owner/repo');
+    expect(out).toMatch(/\)\]\(https:\/\/github\.com\/owner\/repo\)$/);
+  });
+});

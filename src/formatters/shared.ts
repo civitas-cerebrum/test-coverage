@@ -18,7 +18,7 @@ export function renderShieldsBadge(pct: number, passed: boolean, linkUrl?: strin
 export function getGithubRepoUrl(env: NodeJS.ProcessEnv = process.env): string | undefined {
   const repo = env.GITHUB_REPOSITORY;
   if (!repo) return undefined;
-  const server = env.GITHUB_SERVER_URL || 'https://github.com';
+  const server = (env.GITHUB_SERVER_URL || 'https://github.com').replace(/\/+$/, '');
   return `${server}/${repo}`;
 }
 
