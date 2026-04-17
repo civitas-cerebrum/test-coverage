@@ -10,6 +10,7 @@ import {
   MethodKey,
   OutputFormat,
 } from './types';
+import { createProgram, isIgnored, isSourceFile, isTestFile, ProgramContext } from './program';
 
 export class ApiCoverageReporter {
   private rootDir: string;
@@ -19,6 +20,7 @@ export class ApiCoverageReporter {
   private outputFormat?: OutputFormat;
   private debug: boolean;
   private threshold: number;
+  private ctx!: ProgramContext;
 
   constructor(options: ApiCoverageOptions = {}) {
     this.rootDir = options.rootDir || process.cwd();
@@ -31,74 +33,6 @@ export class ApiCoverageReporter {
   }
 
   // -----------------------------
-  // Program Setup
-  // -----------------------------
-  private createProgram(): ts.Program {
-    const configPath = ts.findConfigFile(
-      this.rootDir,
-      ts.sys.fileExists,
-      'tsconfig.json'
-    );
-
-    if (!configPath) {
-      throw new Error('tsconfig.json not found in project root');
-    }
-
-    const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
-    const parsed = ts.parseJsonConfigFileContent(
-      configFile.config,
-      ts.sys,
-      path.dirname(configPath)
-    );
-
-    const testGlob = path.join(this.testDir, '**/*.{spec,test}.ts').replace(/\\/g, '/');
-    const testFiles = glob.sync(testGlob);
-
-    const allFiles = Array.from(new Set([...parsed.fileNames, ...testFiles]));
-
-    if (this.debug) {
-      console.log(`[debug] source files from tsconfig: ${parsed.fileNames.length}`);
-      console.log(`[debug] test files found by glob: ${testFiles.length}`);
-      console.log(`[debug] total files in program: ${allFiles.length}`);
-    }
-
-    return ts.createProgram({
-      rootNames: allFiles,
-      options: parsed.options
-    });
-  }
-
-  // -----------------------------
-  // Helpers
-  // -----------------------------
-  private isIgnored(filePath: string): boolean {
-    return this.ignorePaths.some(p => filePath.includes(p));
-  }
-
-  private isTestFile(filePath: string): boolean {
-    const normalised = filePath.replace(/\\/g, '/');
-    const relToTestDir = path.relative(this.testDir, filePath);
-
-    const result =
-      (!relToTestDir.startsWith('..') && !path.isAbsolute(relToTestDir)) ||
-      normalised.endsWith('.spec.ts') ||
-      normalised.endsWith('.test.ts') ||
-      normalised.includes('.spec.') ||
-      normalised.includes('.test.');
-
-    if (this.debug && result) {
-      console.log(`[debug] test file: ${filePath}`);
-    }
-
-    return result;
-  }
-
-  private isSourceFile(filePath: string): boolean {
-    const rel = path.relative(this.srcDir, filePath);
-    return !rel.startsWith('..') && !path.isAbsolute(rel) && !this.isTestFile(filePath);
-  }
-
-  // -----------------------------
   // Extract API (class + methods)
   // -----------------------------
   private buildApiIndex(program: ts.Program): ApiIndex {
@@ -108,8 +42,8 @@ export class ApiCoverageReporter {
       const filePath = sourceFile.fileName;
 
       if (sourceFile.isDeclarationFile) continue;
-      if (!this.isSourceFile(filePath)) continue;
-      if (this.isIgnored(filePath)) continue;
+      if (!isSourceFile(this.ctx, filePath)) continue;
+      if (isIgnored(this.ctx, filePath)) continue;
 
       const visit = (node: ts.Node) => {
         if (ts.isClassDeclaration(node) && node.name) {
@@ -292,8 +226,8 @@ export class ApiCoverageReporter {
       const filePath = sourceFile.fileName;
 
       if (sourceFile.isDeclarationFile) continue;
-      if (!this.isSourceFile(filePath)) continue;
-      if (this.isIgnored(filePath)) continue;
+      if (!isSourceFile(this.ctx, filePath)) continue;
+      if (isIgnored(this.ctx, filePath)) continue;
 
       const visit = (node: ts.Node) => {
         let currentMethodKey: MethodKey | null = null;
@@ -347,7 +281,14 @@ export class ApiCoverageReporter {
   // Main Execution
   // -----------------------------
   public async runCoverageReport(): Promise<boolean> {
-    const program = this.createProgram();
+    this.ctx = createProgram({
+      rootDir: this.rootDir,
+      srcDir: this.srcDir,
+      testDir: this.testDir,
+      ignorePaths: this.ignorePaths,
+      debug: this.debug,
+    });
+    const program = this.ctx.program;
     const checker = program.getTypeChecker();
 
     const apiIndex = this.buildApiIndex(program);
@@ -371,8 +312,8 @@ export class ApiCoverageReporter {
       const filePath = sourceFile.fileName;
 
       if (sourceFile.isDeclarationFile) continue;
-      if (!this.isTestFile(filePath)) continue;
-      if (this.isIgnored(filePath)) continue;
+      if (!isTestFile(this.ctx, filePath)) continue;
+      if (isIgnored(this.ctx, filePath)) continue;
 
       if (this.debug) {
         console.log(`[debug] scanning test file: ${filePath}`);
