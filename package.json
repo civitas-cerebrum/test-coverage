@@ -1,6 +1,6 @@
 {
   "name": "@civitas-cerebrum/test-coverage",
-  "version": "0.0.9",
+  "version": "0.1.0",
   "description": "Checks if public methods of TypeScript classes are called in test files via AST analysis.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
